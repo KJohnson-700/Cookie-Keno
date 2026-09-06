@@ -1,0 +1,65 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# testing
+coverage/
+
+# next.js
+.next/
+out/
+
+# production
+build/
+dist/
+
+# misc
+.DS_Store
+*.pem
+Thumbs.db
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (DO NOT COMMIT SECRETS)
+.env
+.env.local
+.env.*.local
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# anchor / rust (we're not using this for v1, but keep ignore rules in case we add it later)
+target/
+**/target/
+**/*.rs.bk
+.anchor/
+
+# editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# dev/build logs
+*.log
+dev.stdout.log
+dev.stderr.log
+build.stdout.log
+build.stderr.log
+
+# backup folders
+*.old/
+*.unused
+.*.unused
+node_modules*.backup/
+node_modules.fresh/
+
