@@ -14,13 +14,39 @@
 - [x] Thesis greenlit
 - [x] Folder created on Desktop (`C:\Users\AbuBa\Desktop\cookie-clicker\`)
 - [x] THESIS.md and CLAUDE.md written
-- [ ] Repo initialized (git init)
-- [ ] Anchor program scaffolded (`anchor init` or manual)
-- [ ] Frontend scaffolded (`create-next-app`)
-- [ ] First on-chain click on Cookie Chain devnet
-- [ ] Mainnet deploy
+- [x] Repo initialized (git init) and first commit (2bec2ba)
+- [x] Next.js 16 + React 19 app scaffolded in `app/`
+- [x] Solana wallet stack installed (`@solana/web3.js`, wallet-adapter-react, spl-token, spl-memo, lucide-react)
+- [x] Custom Nightly wallet adapter (no first-party adapter exists; wraps `window.nightly.solana`)
+- [x] Clicker transaction builder (SystemProgram.transfer + Memo program)
+- [x] Wallet connect UI, cookie SVG, stats grid, upgrade shop (8 buildings)
+- [x] Dev server running on http://localhost:3000 — page returns 200
+- [ ] Replace TREASURY_PK placeholder with real keypair + fund it
+- [ ] First on-chain click on Cookie Chain mainnet (needs user to install Nightly)
+- [ ] Real-time leaderboard via cookiescan API
+- [ ] .cook name multiplier read
+- [ ] Vercel deploy
 - [ ] X thread posted
 - [ ] Telegram share
+
+## Dev commands
+
+```bash
+cd "C:\Users\AbuBa\Desktop\cookie-clicker\app"
+.\node_modules\.bin\next.cmd dev --webpack -p 3000
+```
+
+Open http://localhost:3000 to test. Install Nightly from https://nightly.app and use the in-app Connect button. (Currently TREASURY_PK is the SystemProgram "burn" address `11111111...` so all clicks fail until the real treasury is set.)
+
+## Key TODOs in code
+
+- `app/lib/cookiechain.ts` line 12: `TREASURY_ADDRESS_PLACEHOLDER` — replace with real treasury wallet pubkey
+- `app/app/page.tsx` line 18: `TREASURY_PK` — same, used to build the transfer instruction
+- `app/lib/nightly-adapter.ts`: full custom adapter; tested with WalletContextProvider
+
+## Architectural decision: Path A (Lean)
+
+We chose **no custom Anchor program** — every click is a SystemProgram.transfer (burning COOK) + Memo program write. PDAs and on-chain state are derived off-chain from the tx history. Saves us the Rust toolchain install (Rust/Cargo/Anchor are NOT on this machine) and ships faster. If the judges want a real program address, we can add it on Day 2-3.
 
 ## Tech stack (locked — don't substitute)
 
