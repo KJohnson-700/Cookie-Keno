@@ -7,6 +7,10 @@ export const DRAW_SIZE = 8;
 export const MIN_WAGER = 0.01;
 export const MAX_WAGER = 10;
 
+// Progressive Jackpot
+export const JACKPOT_CONTRIBUTION_RATE = 0.01; // 1% of each wager
+export const JACKPOT_CHANCE = 0.001; // 0.1% chance per round (1 in 1000)
+
 // Standard keno payout table (hits → multiplier)
 // Based on 8-of-40 draw
 export const PAYOUT_TABLE: Record<number, number[]> = {

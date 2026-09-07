@@ -11,11 +11,14 @@ import { WagerPanel } from '@/components/WagerPanel';
 import { ResultsPanel } from '@/components/ResultsPanel';
 import { Leaderboard } from '@/components/Leaderboard';
 import { MultiplierBadge } from '@/components/MultiplierBadge';
+import { JackpotDisplay } from '@/components/JackpotDisplay';
 import {
   MIN_PICKS,
   MAX_PICKS,
   MIN_WAGER,
   MAX_WAGER,
+  JACKPOT_CONTRIBUTION_RATE,
+  JACKPOT_CHANCE,
   deriveDraw,
   countHits,
   calculatePayout,
@@ -77,6 +80,8 @@ type RoundResult = {
   wager: number;
   signature?: string;
   blockhash?: string;
+  jackpotWon: boolean;
+  jackpotAmount: number;
   timestamp: number;
 };
 
@@ -91,6 +96,8 @@ export default function Home() {
   const [toast, setToast] = useState<{ kind: 'ok' | 'err' | 'win'; msg: string; sig?: string } | null>(null);
   const [lastResult, setLastResult] = useState<RoundResult | null>(null);
   const [roundHistory, setRoundHistory] = useState<RoundResult[]>([]);
+  const [jackpot, setJackpot] = useState(0); // Progressive jackpot pool
+  const [jackpotTriggered, setJackpotTriggered] = useState(false); // Current round triggered jackpot
 
   // Poll for Nightly provider
   useEffect(() => {
@@ -198,15 +205,29 @@ export default function Home() {
       // Derive draw from blockhash (provably fair)
       const draw = deriveDraw(blockhash);
       const hits = countHits(selectedNumbers, draw);
+
+      // Progressive jackpot
+      const isJackpotRound = Math.random() < JACKPOT_CHANCE;
+      const jackpotContribution = wager * JACKPOT_CONTRIBUTION_RATE;
+      const newJackpot = jackpot + jackpotContribution;
+      const jackpotWin = isJackpotRound && hits > 0;
+      const jackpotAmount = jackpotWin ? newJackpot : 0;
+
       const rawPayout = calculatePayout(selectedNumbers.length, hits) * wager;
       const multiplier = hasCookName ? COOK_NAME_MULTIPLIER : 1;
-      const payout = rawPayout * multiplier;
+      const payout = (rawPayout * multiplier) + jackpotAmount;
+
+      // Update jackpot pool
+      setJackpot(isJackpotRound ? 0 : newJackpot);
+      setJackpotTriggered(isJackpotRound);
 
       const result: RoundResult = {
         picks: selectedNumbers,
         draw,
         hits,
         payout,
+        jackpotWon: jackpotWin,
+        jackpotAmount,
         wager,
         signature,
         blockhash,
@@ -217,7 +238,8 @@ export default function Home() {
       setRoundHistory((prev) => [result, ...prev].slice(0, 10));
 
       if (payout > 0) {
-        setToast({ kind: 'win', msg: `Won ${payout.toFixed(2)} COOK! (demo - payouts not sent)`, sig: signature });
+        const jackpotMsg = jackpotWin ? ` 🎰 JACKPOT +${jackpotAmount.toFixed(2)}!` : '';
+        setToast({ kind: 'win', msg: `Won ${payout.toFixed(2)} COOK!${jackpotMsg} (demo)`, sig: signature });
       } else {
         setToast({ kind: 'ok', msg: `Round complete - ${hits} hits`, sig: signature });
       }
@@ -225,6 +247,8 @@ export default function Home() {
 
       // Clear selection for next round
       setSelectedNumbers([]);
+      // Reset jackpot triggered after showing
+      setTimeout(() => setJackpotTriggered(false), 3000);
 
     } catch (err: any) {
       const raw = String(err?.message ?? err ?? 'Play failed');
@@ -241,13 +265,25 @@ export default function Home() {
       console.log('Select at least', MIN_PICKS, 'numbers');
       return;
     }
-    // Simulate a draw
+    // Simulate a draw (debug mode)
     const fakeBlockhash = Math.random().toString(36).slice(2, 34);
     const draw = deriveDraw(fakeBlockhash);
     const hits = countHits(selectedNumbers, draw);
+
+    // Progressive jackpot (debug mode)
+    const isJackpotRound = Math.random() < JACKPOT_CHANCE;
+    const jackpotContribution = wager * JACKPOT_CONTRIBUTION_RATE;
+    const newJackpot = jackpot + jackpotContribution;
+    const jackpotWin = isJackpotRound && hits > 0;
+    const jackpotAmount = jackpotWin ? newJackpot : 0;
+
     const rawPayout = calculatePayout(selectedNumbers.length, hits) * wager;
-      const multiplier = hasCookName ? COOK_NAME_MULTIPLIER : 1;
-      const payout = rawPayout * multiplier;
+    const multiplier = hasCookName ? COOK_NAME_MULTIPLIER : 1;
+    const payout = (rawPayout * multiplier) + jackpotAmount;
+
+    // Update jackpot
+    setJackpot(isJackpotRound ? 0 : newJackpot);
+    setJackpotTriggered(isJackpotRound);
 
     const result: RoundResult = {
       picks: selectedNumbers,
@@ -255,6 +291,8 @@ export default function Home() {
       hits,
       payout,
       wager,
+      jackpotWon: jackpotWin,
+      jackpotAmount,
       blockhash: fakeBlockhash,
       timestamp: Date.now(),
     };
@@ -306,6 +344,9 @@ export default function Home() {
       </header>
 
       <section className="flex-1 flex flex-col items-start gap-6 px-4 py-6 sm:py-8 max-w-3xl mx-auto w-full">
+        {/* Jackpot Display */}
+        <JackpotDisplay jackpot={jackpot} triggered={jackpotTriggered} />
+
         {/* Selection info */}
         <div className="w-full flex items-center justify-between text-sm">
           <span className="text-slate-400">
