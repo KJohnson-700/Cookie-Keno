@@ -37,10 +37,31 @@ function getNightly(): NightlyProvider | null {
 function isPlaceholder(pk: PublicKey | null | undefined): boolean {
   if (!pk) return true;
   try {
-    return pk.equals(PLACEHOLDER_PK);
+    if (pk.equals(PLACEHOLDER_PK)) return true;
+    // Also catch all-zero or all-equal bytes — some wallets use these as
+    // a placeholder before unlock / before chain selection.
+    const b = pk.toBytes();
+    const allSame = b.every((x) => x === b[0]);
+    if (allSame) return true;
+    return false;
   } catch {
     return true;
   }
+}
+
+// Wait for Nightly to settle on a non-placeholder publicKey after connect().
+// connect() resolves before Nightly has updated its publicKey, so a single
+// read is racy. Poll for up to `timeoutMs`.
+async function waitForRealPublicKey(n: NightlyProvider, timeoutMs: number): Promise<PublicKey | null> {
+  const start = Date.now();
+  let last: PublicKey | null = null;
+  while (Date.now() - start < timeoutMs) {
+    const cur = n.publicKey ?? null;
+    if (cur && !isPlaceholder(cur)) return cur;
+    if (cur) last = cur;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  return last;
 }
 
 type SaveState = {
@@ -153,15 +174,18 @@ export default function Home() {
       return;
     }
     try {
-      const r = await n.connect();
-      const pk = r.publicKey;
-      if (isPlaceholder(pk)) {
-        throw new Error('Nightly returned a placeholder public key. Try again.');
+      await n.connect();
+      // connect() resolves before Nightly updates n.publicKey. Poll.
+      const pk = await waitForRealPublicKey(n, 5000);
+      if (!pk) {
+        throw new Error(
+          'Nightly stayed on the placeholder address. Open the Nightly extension, make sure your wallet is unlocked and on Cookie Chain, then click Connect again.'
+        );
       }
       setNightlyPk(pk);
     } catch (e: any) {
       setToast({ kind: 'err', msg: e?.message ?? 'Connect failed' });
-      setTimeout(() => setToast(null), 3500);
+      setTimeout(() => setToast(null), 5000);
     }
   }, []);
 
@@ -187,15 +211,18 @@ export default function Home() {
     let wallet = publicKey;
     if (!wallet || isPlaceholder(wallet)) {
       try {
-        const r = await n.connect();
-        wallet = r.publicKey;
-        if (isPlaceholder(wallet)) {
-          throw new Error('Connect failed: placeholder public key');
+        await n.connect();
+        const pk = await waitForRealPublicKey(n, 5000);
+        if (!pk) {
+          throw new Error(
+            'Nightly stayed on the placeholder. Unlock your wallet in the Nightly extension and switch to Cookie Chain, then click again.'
+          );
         }
+        wallet = pk;
         setNightlyPk(wallet);
       } catch (e: any) {
         setToast({ kind: 'err', msg: e?.message ?? 'Connect cancelled' });
-        setTimeout(() => setToast(null), 3500);
+        setTimeout(() => setToast(null), 5000);
         return;
       }
     }
