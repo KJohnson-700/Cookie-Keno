@@ -21,8 +21,11 @@
 - [x] Clicker transaction builder (SystemProgram.transfer + Memo program)
 - [x] Wallet connect UI, cookie SVG, stats grid, upgrade shop (8 buildings)
 - [x] Dev server running on http://localhost:3000 — page returns 200
-- [ ] Replace TREASURY_PK placeholder with real keypair + fund it
-- [ ] First on-chain click on Cookie Chain mainnet (needs user to install Nightly)
+- [x] **Treasury keypair generated** (pubkey `5Nhcsv4ip2dF5fyN6of3NR98pv3wq75tWdPgqi9iDf29`, secret in `app/scripts/treasury.json` gitignored)
+- [x] **Clicker logic simplified** — uniform burn per click; golden cookie is off-chain visual + counter boost (no double-burn)
+- [x] README with full bridge instructions
+- [ ] User bridges ~$1-2 of COOK from Solana → treasury + personal Nightly wallet
+- [ ] First real on-chain click on Cookie Chain mainnet
 - [ ] Real-time leaderboard via cookiescan API
 - [ ] .cook name multiplier read
 - [ ] Vercel deploy
@@ -36,13 +39,18 @@ cd "C:\Users\AbuBa\Desktop\cookie-clicker\app"
 .\node_modules\.bin\next.cmd dev --webpack -p 3000
 ```
 
-Open http://localhost:3000 to test. Install Nightly from https://nightly.app and use the in-app Connect button. (Currently TREASURY_PK is the SystemProgram "burn" address `11111111...` so all clicks fail until the real treasury is set.)
+Open http://localhost:3000 to test. Install Nightly from https://nightly.app and use the in-app Connect button.
+
+## Treasury (locked in)
+
+- **Public key**: `5Nhcsv4ip2dF5fyN6of3NR98pv3wq75tWdPgqi9iDf29`
+- **Private key**: `app/scripts/treasury.json` (gitignored) — user must back this up
+- **Funding path**: bridge SPL COOK from Solana via https://bridge.cookiescan.io to this address
 
 ## Key TODOs in code
 
-- `app/lib/cookiechain.ts` line 12: `TREASURY_ADDRESS_PLACEHOLDER` — replace with real treasury wallet pubkey
-- `app/app/page.tsx` line 18: `TREASURY_PK` — same, used to build the transfer instruction
-- `app/lib/nightly-adapter.ts`: full custom adapter; tested with WalletContextProvider
+- After deploy, optionally add the **starter-pack sponsor** feature (treasury → new user airdrop, requires backend/Vercel function)
+- After deploy, optionally add the **real golden cookie airdrop** (treasury signs separate tx to user on golden hit, requires backend)
 
 ## Architectural decision: Path A (Lean)
 

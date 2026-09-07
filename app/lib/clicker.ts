@@ -37,19 +37,20 @@ export type BuildClickOptions = {
   clickNumber: number;
   burnLamports: number;
   isGolden: boolean;
-  goldenLamports?: number;
 };
 
 export function buildClickTransaction(opts: BuildClickOptions): Transaction {
-  const { wallet, treasury, burnLamports, isGolden, clickNumber, goldenLamports } = opts;
+  const { wallet, treasury, burnLamports, isGolden, clickNumber } = opts;
   const tx = new Transaction();
 
   // Instruction 1: burn COOK (native transfer to treasury)
+  // Same burn whether or not the click is golden — the on-chain truth is uniform.
+  // The "golden" flag is encoded in the memo for off-chain indexing/visuals.
   tx.add(
     SystemProgram.transfer({
       fromPubkey: wallet,
       toPubkey: treasury,
-      lamports: burnLamports + (isGolden ? goldenLamports ?? 0 : 0),
+      lamports: burnLamports,
     })
   );
 

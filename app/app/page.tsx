@@ -16,10 +16,9 @@ import {
 import {
   CLICK_BURN_LAMPORTS,
   GOLDEN_COOKIE_CHANCE,
-  GOLDEN_COOKIE_LAMPORTS,
 } from '@/lib/cookiechain';
 
-const TREASURY_PK = new PublicKey('11111111111111111111111111111111'); // TODO: replace at deploy
+const TREASURY_PK = new PublicKey('5Nhcsv4ip2dF5fyN6of3NR98pv3wq75tWdPgqi9iDf29');
 const STORAGE_KEY = 'click-the-cookie:v1';
 
 type SaveState = {
@@ -129,7 +128,6 @@ export default function Home() {
         clickNumber,
         burnLamports: CLICK_BURN_LAMPORTS,
         isGolden,
-        goldenLamports: GOLDEN_COOKIE_LAMPORTS,
       });
       const { signature } = await (window as any).nightly?.solana?.signAndSendTransaction
         ? await (window as any).nightly.solana.signAndSendTransaction(tx)
@@ -142,7 +140,7 @@ export default function Home() {
       setSave((s) => ({
         ...s,
         cookies: s.cookies + perClick + (isGolden ? 100 : 0),
-        lifetimeBurned: s.lifetimeBurned + CLICK_BURN_LAMPORTS + (isGolden ? GOLDEN_COOKIE_LAMPORTS : 0),
+        lifetimeBurned: s.lifetimeBurned + CLICK_BURN_LAMPORTS,
         txCount: s.txCount + 1,
         lastTick: Date.now(),
       }));

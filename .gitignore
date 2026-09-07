@@ -63,3 +63,7 @@ build.stderr.log
 node_modules*.backup/
 node_modules.fresh/
 
+# treasury keypair (NEVER commit private keys)
+app/scripts/treasury.json
+app/scripts/.treasury*
+
