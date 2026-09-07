@@ -311,13 +311,13 @@ export default function Home() {
   }, [selectedNumbers, wager]);
 
   return (
-    <main className="min-h-screen flex flex-col text-slate-100">
+    <main className="min-h-screen flex flex-col text-slate-100 overflow-x-hidden">
       <header className="header flex items-center justify-between px-4 sm:px-6 py-4">
         <div className="flex items-center gap-4">
           <img
             src="/images/logo2.jpg"
             alt="Cookie Keno"
-            className="w-16 h-16 rounded-xl border-2"
+            className="w-24 h-24 rounded-xl border-2"
             style={{ objectFit: 'cover', borderColor: 'var(--accent-gold)' }}
           />
           <div>

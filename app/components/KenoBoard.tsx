@@ -65,7 +65,7 @@ export function KenoBoard({ selected, onSelect, drawNumbers = [], hitNumbers = [
 
   return (
     <div className="w-full">
-      <div className="grid grid-cols-8 gap-1 sm:gap-2">
+      <div className="grid grid-cols-8 gap-1 sm:gap-2" style={{ maxWidth: '100%', overflow: 'hidden' }}>
         {Array.from({ length: POOL_SIZE }, (_, i) => i + 1).map((num) => {
           const selectedNow = isSelected(num);
           const revealedNow = isRevealed(num);
