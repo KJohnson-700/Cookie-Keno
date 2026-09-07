@@ -10,15 +10,8 @@ interface KenoBoardProps {
   hitNumbers?: number[];
 }
 
-interface RevealedNumber {
-  num: number;
-  hit: boolean;
-  revealed: boolean;
-}
-
 export function KenoBoard({ selected, onSelect, drawNumbers = [], hitNumbers = [] }: KenoBoardProps) {
-  const [revealed, setRevealed] = useState<RevealedNumber[]>([]);
-  const [showConfetti, setShowConfetti] = useState<number[]>([]);
+  const [revealed, setRevealed] = useState<number[]>([]);
 
   useEffect(() => {
     if (drawNumbers.length === 0) {
@@ -26,27 +19,14 @@ export function KenoBoard({ selected, onSelect, drawNumbers = [], hitNumbers = [
       return;
     }
 
-    const initial: RevealedNumber[] = drawNumbers.map((num) => ({
-      num,
-      hit: hitNumbers.includes(num),
-      revealed: false,
-    }));
-    setRevealed(initial);
+    setRevealed([]);
 
     drawNumbers.forEach((num, index) => {
       setTimeout(() => {
-        setRevealed((prev) =>
-          prev.map((r) => (r.num === num ? { ...r, revealed: true } : r))
-        );
-        if (hitNumbers.includes(num)) {
-          setShowConfetti((prev) => [...prev, num]);
-          setTimeout(() => {
-            setShowConfetti((prev) => prev.filter((n) => n !== num));
-          }, 1000);
-        }
-      }, (index + 1) * 400);
+        setRevealed((prev) => [...prev, num]);
+      }, (index + 1) * 300);
     });
-  }, [drawNumbers.join(','), hitNumbers.join(',')]);
+  }, [drawNumbers.join(',')]);
 
   const handleClick = useCallback(
     (num: number) => {
@@ -61,88 +41,60 @@ export function KenoBoard({ selected, onSelect, drawNumbers = [], hitNumbers = [
 
   const isHit = (num: number) => hitNumbers.includes(num);
   const isSelected = (num: number) => selected.includes(num);
-  const isRevealed = (num: number) => revealed.find((r) => r.num === num)?.revealed;
+  const isRevealed = (num: number) => revealed.includes(num);
 
   return (
-    <div className="w-full">
-      <div className="grid grid-cols-8 gap-1 sm:gap-2" style={{ maxWidth: '100%', overflow: 'hidden' }}>
+    <div className="w-full overflow-hidden">
+      <div
+        className="grid gap-1"
+        style={{
+          gridTemplateColumns: 'repeat(8, 1fr)',
+          maxWidth: '100%'
+        }}
+      >
         {Array.from({ length: POOL_SIZE }, (_, i) => i + 1).map((num) => {
           const selectedNow = isSelected(num);
           const revealedNow = isRevealed(num);
           const hit = isHit(num);
           const isDrawn = drawNumbers.includes(num);
-          const confetti = showConfetti.includes(num);
+
+          let bgColor = '#1a1a24';
+          let textColor = '#7a7a85';
+          let borderColor = '#252530';
+
+          if (selectedNow) {
+            bgColor = '#d4a853';
+            textColor = '#000000';
+          } else if (revealedNow) {
+            if (hit) {
+              bgColor = '#22c55e';
+              textColor = '#ffffff';
+            } else {
+              bgColor = '#7f1d1d';
+              textColor = '#fca5a5';
+            }
+          }
 
           return (
-            <div key={num} className="relative aspect-square">
-              <button
-                onClick={() => handleClick(num)}
-                disabled={isDrawn && !revealedNow}
-                className={`
-                  w-full h-full rounded text-sm sm:text-base md:text-lg font-bold font-mono
-                  transition-all duration-200 flex items-center justify-center
-                  ${selectedNow
-                    ? 'bg-[#d4a853] text-black shadow-lg shadow-[#d4a853]/30 scale-105'
-                    : revealedNow
-                      ? hit
-                        ? 'bg-green-500 text-white shadow-lg shadow-green-500/40'
-                        : 'bg-red-900/60 text-red-300'
-                      : 'bg-[#1a1a24] text-[#7a7a85] hover:bg-[#252530] border border-[#252530]'
-                  }
-                  ${revealedNow ? 'animate-pop' : ''}
-                `}
-                style={{ fontFamily: "'Space Mono', monospace" }}
-              >
-                {num}
-              </button>
-
-              {confetti && (
-                <div className="absolute inset-0 pointer-events-none">
-                  {[...Array(8)].map((_, i) => (
-                    <div
-                      key={i}
-                      className="absolute w-1.5 h-1.5 rounded-full"
-                      style={{
-                        backgroundColor: ['#d4a853', '#f5d76e', '#ffd700', '#ffed4a'][i % 4],
-                        left: '50%',
-                        top: '50%',
-                        animation: `confetti-fly-${i} 0.8s ease-out forwards`,
-                      }}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
+            <button
+              key={num}
+              onClick={() => handleClick(num)}
+              disabled={isDrawn && !revealedNow}
+              className="aspect-square rounded font-mono text-sm font-bold transition-colors"
+              style={{
+                backgroundColor: bgColor,
+                color: textColor,
+                border: `1px solid ${borderColor}`,
+                minWidth: 0,
+                padding: 0,
+                lineHeight: 1,
+              }}
+            >
+              {num}
+            </button>
           );
         })}
       </div>
-
-      <style jsx>{`
-        @keyframes pop {
-          0% { transform: scale(0.5); opacity: 0; }
-          50% { transform: scale(1.15); }
-          100% { transform: scale(1); opacity: 1; }
-        }
-        .animate-pop {
-          animation: pop 0.3s ease-out forwards;
-        }
-        @keyframes confetti-fly-0 { to { transform: translate(-150%, -150%); opacity: 0; } }
-        @keyframes confetti-fly-1 { to { transform: translate(150%, -150%); opacity: 0; } }
-        @keyframes confetti-fly-2 { to { transform: translate(-150%, 150%); opacity: 0; } }
-        @keyframes confetti-fly-3 { to { transform: translate(150%, 150%); opacity: 0; } }
-        @keyframes confetti-fly-4 { to { transform: translate(-200%, -50%); opacity: 0; } }
-        @keyframes confetti-fly-5 { to { transform: translate(200%, -50%); opacity: 0; } }
-        @keyframes confetti-fly-6 { to { transform: translate(-200%, 50%); opacity: 0; } }
-        @keyframes confetti-fly-7 { to { transform: translate(200%, 50%); opacity: 0; } }
-        div:nth-child(8n+0) { animation: confetti-fly-0 0.8s ease-out forwards; }
-        div:nth-child(8n+1) { animation: confetti-fly-1 0.8s ease-out forwards; }
-        div:nth-child(8n+2) { animation: confetti-fly-2 0.8s ease-out forwards; }
-        div:nth-child(8n+3) { animation: confetti-fly-3 0.8s ease-out forwards; }
-        div:nth-child(8n+4) { animation: confetti-fly-4 0.8s ease-out forwards; }
-        div:nth-child(8n+5) { animation: confetti-fly-5 0.8s ease-out forwards; }
-        div:nth-child(8n+6) { animation: confetti-fly-6 0.8s ease-out forwards; }
-        div:nth-child(8n+7) { animation: confetti-fly-7 0.8s ease-out forwards; }
-      `}</style>
     </div>
   );
 }
