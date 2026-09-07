@@ -448,7 +448,9 @@ export default function Home() {
 
       <footer className="footer text-center text-[11px] py-4">
         <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4">
-          <span>🎰 Pick 1-10 • 8 drawn • Win based on hits</span>
+          <span className="font-bold tracking-widest" style={{color: 'var(--accent-gold)'}}>PICK 1-10</span>
+          <span className="hidden sm:inline" style={{color: 'var(--text-muted)'}}>•</span>
+          <span className="font-bold tracking-widest" style={{color: 'var(--text-secondary)'}}>8 DRAWN</span>
           <span className="hidden sm:inline" style={{color: 'var(--text-muted)'}}>•</span>
           <span style={{color: 'var(--text-secondary)'}}>Treasury: <code style={{color: 'var(--accent-gold-dim)'}}>5Nhcsv4ip2dF5...</code></span>
           <span className="hidden sm:inline" style={{color: 'var(--text-muted)'}}>•</span>
