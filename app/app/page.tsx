@@ -13,6 +13,7 @@ import { Leaderboard } from '@/components/Leaderboard';
 import { MultiplierBadge } from '@/components/MultiplierBadge';
 import { JackpotDisplay } from '@/components/JackpotDisplay';
 import { Celebration } from '@/components/Celebration';
+import { ResultPopup } from '@/components/ResultPopup';
 import {
   MIN_PICKS,
   MAX_PICKS,
@@ -100,6 +101,7 @@ export default function Home() {
   const [jackpot, setJackpot] = useState(0); // Progressive jackpot pool
   const [jackpotTriggered, setJackpotTriggered] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
+  const [showResultPopup, setShowResultPopup] = useState(false);
   const [celebrationType, setCelebrationType] = useState<'win' | 'jackpot'>('win');
 
   // Poll for Nightly provider
@@ -246,8 +248,10 @@ export default function Home() {
         // Trigger celebration
         setCelebrationType(jackpotWin ? 'jackpot' : 'win');
         setShowCelebration(true);
+        setShowResultPopup(true);
         setTimeout(() => setShowCelebration(false), 3000);
       } else {
+        setShowResultPopup(true);
         setToast({ kind: 'ok', msg: `Round complete - ${hits} hits`, sig: signature });
       }
       setTimeout(() => setToast(null), 4000);
@@ -432,12 +436,23 @@ export default function Home() {
       </section>
 
       <Celebration active={showCelebration} type={celebrationType} />
+      {lastResult && (
+        <ResultPopup
+          hits={lastResult.hits}
+          payout={lastResult.payout}
+          wager={lastResult.wager}
+          active={showResultPopup}
+          onClose={() => setShowResultPopup(false)}
+        />
+      )}
 
       <footer className="footer text-center text-[11px] py-4">
         <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4">
           <span>🎰 Pick 1-10 • 8 drawn • Win based on hits</span>
-          <span className="hidden sm:inline text-slate-700">•</span>
-          <span className="text-slate-600">Treasury: <code className="text-amber-400/60">5Nhcsv4ip2dF5...</code></span>
+          <span className="hidden sm:inline" style={{color: 'var(--text-muted)'}}>•</span>
+          <span style={{color: 'var(--text-secondary)'}}>Treasury: <code style={{color: 'var(--accent-gold-dim)'}}>5Nhcsv4ip2dF5...</code></span>
+          <span className="hidden sm:inline" style={{color: 'var(--text-muted)'}}>•</span>
+          <a href="https://x.com/Theecryptopimp" target="_blank" rel="noreferrer" style={{color: 'var(--accent-gold)'}}>@Theecryptopimp</a>
         </div>
       </footer>
 
