@@ -4,99 +4,59 @@ interface ResultPopupProps {
   hits: number;
   payout: number;
   wager: number;
+  blockhash?: string;
   active: boolean;
   onClose: () => void;
 }
 
-export function ResultPopup({ hits, payout, wager, active, onClose }: ResultPopupProps) {
+export function ResultPopup({ hits, payout, wager, blockhash, active, onClose }: ResultPopupProps) {
   if (!active) return null;
 
   const isWin = payout > 0;
   const isBigWin = payout >= wager * 5;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/70"
-        onClick={onClose}
-      />
-
-      {/* Popup */}
-      <div
-        className={`relative p-8 rounded-2xl text-center animate-scale-in ${
-          isWin
-            ? isBigWin
-              ? 'bg-gradient-to-br from-amber-600 to-yellow-500'
-              : 'bg-gradient-to-br from-green-700 to-green-600'
-            : 'bg-gradient-to-br from-red-800 to-red-900'
-        }`}
-        style={{
-          boxShadow: isWin
-            ? '0 0 60px rgba(212, 168, 83, 0.6), 0 0 120px rgba(212, 168, 83, 0.3)'
-            : '0 0 40px rgba(220, 38, 38, 0.4)',
-          animation: 'scale-in 0.3s ease-out',
-        }}
-      >
-        {/* Result text */}
-        <div
-          className="text-5xl font-bold mb-2"
-          style={{
-            fontFamily: "'Bebas Neue', sans-serif",
-            color: isWin ? '#000' : '#fff',
-            textShadow: isWin ? 'none' : '0 0 20px rgba(255,255,255,0.3)',
-          }}
-        >
+    <div style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(4,4,8,.78)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 26px' }}>
+      <div style={{ width: '100%', maxWidth: 320, background: isWin ? (isBigWin ? 'linear-gradient(160deg, #b45309 0%, #0f0f16 100%)' : 'linear-gradient(160deg, #14532d 0%, #0f0f16 100%)') : 'linear-gradient(160deg, #7f1d1d 0%, #0f0f16 100%)', borderRadius: 20, padding: '24px 20px', textAlign: 'center', boxShadow: isWin ? '0 0 60px rgba(212,168,83,.4)' : '0 0 40px rgba(220,38,38,.4)', animation: 'pop 0.3s ease-out' }}>
+        <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: isBigWin ? 36 : 32, letterSpacing: '.14em', color: isWin ? (isBigWin ? '#d4a853' : '#fff') : '#fca5a5', display: 'block', marginBottom: 4 }}>
           {isBigWin ? 'BIG WIN!' : isWin ? 'YOU WIN!' : 'NO WIN'}
+        </span>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'center', marginTop: 6 }}>
+          <span style={{ fontSize: 12, letterSpacing: '.12em', opacity: 0.75, color: isWin ? '#fff' : '#fca5a5' }}>{hits} / 8 HITS</span>
         </div>
 
-        {/* Hits */}
-        <div
-          className="text-2xl mb-4"
-          style={{ color: isWin ? '#000' : '#fca5a5' }}
-        >
-          {hits} / 8 HITS
-        </div>
-
-        {/* Payout */}
-        <div
-          className="text-4xl font-bold font-mono"
-          style={{ color: isWin ? '#000' : '#fff' }}
-        >
+        <span style={{ fontSize: 28, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: isWin ? '#d4a853' : '#fff', display: 'block', marginTop: 8 }}>
           {payout.toFixed(2)} COOK
-        </div>
+        </span>
 
-        {/* Profit/Loss */}
         {isWin && (
-          <div
-            className="text-lg font-mono mt-2"
-            style={{ color: '#000' }}
-          >
+          <span style={{ fontSize: 11, letterSpacing: '.08em', opacity: 0.7, color: '#d4a853', display: 'block', marginTop: 2 }}>
             +{(payout - wager).toFixed(2)} profit
-          </div>
+          </span>
         )}
 
-        {/* Close button */}
+        <div style={{ width: '100%', height: 1, background: 'rgba(0,0,0,.18)', margin: '14px 0 12px' }}></div>
+
+        {blockhash && (
+          <span style={{ fontSize: 8.5, letterSpacing: '.06em', opacity: 0.65, color: 'var(--text-muted)', display: 'block' }}>
+            Block: {blockhash?.slice(0, 12)}…{blockhash?.slice(-8)}
+          </span>
+        )}
+
         <button
           onClick={onClose}
-          className="mt-6 px-8 py-2 rounded-full text-sm font-bold"
-          style={{
-            backgroundColor: isWin ? '#000' : '#fff',
-            color: isWin ? '#d4a853' : '#000',
-          }}
+          style={{ width: '100%', marginTop: 16, padding: '13px 0', borderRadius: 11, background: isWin ? '#d4a853' : '#fff', color: isWin ? '#0a0a0f' : '#000', fontFamily: "'Bebas Neue', sans-serif", fontSize: 17, letterSpacing: '.2em', border: 'none', cursor: 'pointer' }}
         >
           CONTINUE
         </button>
       </div>
 
       <style jsx>{`
-        @keyframes scale-in {
-          0% { transform: scale(0); opacity: 0; }
-          50% { transform: scale(1.1); }
+        @keyframes pop {
+          0% { transform: scale(.5); opacity: 0; }
+          60% { transform: scale(1.06); opacity: 1; }
           100% { transform: scale(1); opacity: 1; }
-        }
-        .animate-scale-in {
-          animation: scale-in 0.3s ease-out forwards;
         }
       `}</style>
     </div>
