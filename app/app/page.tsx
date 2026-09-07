@@ -12,6 +12,7 @@ import { ResultsPanel } from '@/components/ResultsPanel';
 import { Leaderboard } from '@/components/Leaderboard';
 import { MultiplierBadge } from '@/components/MultiplierBadge';
 import { JackpotDisplay } from '@/components/JackpotDisplay';
+import { Celebration } from '@/components/Celebration';
 import {
   MIN_PICKS,
   MAX_PICKS,
@@ -97,7 +98,9 @@ export default function Home() {
   const [lastResult, setLastResult] = useState<RoundResult | null>(null);
   const [roundHistory, setRoundHistory] = useState<RoundResult[]>([]);
   const [jackpot, setJackpot] = useState(0); // Progressive jackpot pool
-  const [jackpotTriggered, setJackpotTriggered] = useState(false); // Current round triggered jackpot
+  const [jackpotTriggered, setJackpotTriggered] = useState(false);
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [celebrationType, setCelebrationType] = useState<'win' | 'jackpot'>('win');
 
   // Poll for Nightly provider
   useEffect(() => {
@@ -240,6 +243,10 @@ export default function Home() {
       if (payout > 0) {
         const jackpotMsg = jackpotWin ? ` 🎰 JACKPOT +${jackpotAmount.toFixed(2)}!` : '';
         setToast({ kind: 'win', msg: `Won ${payout.toFixed(2)} COOK!${jackpotMsg} (demo)`, sig: signature });
+        // Trigger celebration
+        setCelebrationType(jackpotWin ? 'jackpot' : 'win');
+        setShowCelebration(true);
+        setTimeout(() => setShowCelebration(false), 3000);
       } else {
         setToast({ kind: 'ok', msg: `Round complete - ${hits} hits`, sig: signature });
       }
@@ -306,19 +313,16 @@ export default function Home() {
   return (
     <main className="min-h-screen flex flex-col text-slate-100">
       <header className="header flex items-center justify-between px-4 sm:px-6 py-4">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-amber-500/20 grid place-items-center text-amber-300 text-lg">
-            🎰
-          </div>
+        <div className="flex items-center gap-4">
+          <img
+            src="/images/logo2.jpg"
+            alt="Cookie Keno"
+            className="w-12 h-12 rounded-lg"
+            style={{ objectFit: 'cover' }}
+          />
           <div>
             <h1 className="text-xl tracking-widest gold-text">COOKIE KENO</h1>
             <div className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>ON CHAIN • PROVABLY FAIR</div>
-            <div className="text-[11px] text-slate-500 -mt-0.5">
-              on{' '}
-              <a className="text-amber-300 hover:underline" href="https://www.cookiechain.wtf" target="_blank" rel="noreferrer">
-                Cookie Chain
-              </a>
-            </div>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -426,6 +430,8 @@ export default function Home() {
       <section className="px-4 pb-6 max-w-3xl mx-auto w-full">
         <Leaderboard />
       </section>
+
+      <Celebration active={showCelebration} type={celebrationType} />
 
       <footer className="footer text-center text-[11px] py-4">
         <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4">
