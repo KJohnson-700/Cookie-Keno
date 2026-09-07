@@ -20,14 +20,12 @@ export function KenoBoard({ selected, onSelect, drawNumbers = [], hitNumbers = [
   const [revealed, setRevealed] = useState<RevealedNumber[]>([]);
   const [showConfetti, setShowConfetti] = useState<number[]>([]);
 
-  // Trigger reveal animation when drawNumbers change
   useEffect(() => {
     if (drawNumbers.length === 0) {
       setRevealed([]);
       return;
     }
 
-    // Initialize all as not revealed
     const initial: RevealedNumber[] = drawNumbers.map((num) => ({
       num,
       hit: hitNumbers.includes(num),
@@ -35,22 +33,20 @@ export function KenoBoard({ selected, onSelect, drawNumbers = [], hitNumbers = [
     }));
     setRevealed(initial);
 
-    // Reveal one by one
     drawNumbers.forEach((num, index) => {
       setTimeout(() => {
         setRevealed((prev) =>
           prev.map((r) => (r.num === num ? { ...r, revealed: true } : r))
         );
-        // Show confetti for hits
         if (hitNumbers.includes(num)) {
           setShowConfetti((prev) => [...prev, num]);
           setTimeout(() => {
             setShowConfetti((prev) => prev.filter((n) => n !== num));
           }, 1000);
         }
-      }, (index + 1) * 400); // 400ms delay between each reveal
+      }, (index + 1) * 400);
     });
-  }, [drawNumbers, hitNumbers]);
+  }, [drawNumbers.join(','), hitNumbers.join(',')]);
 
   const handleClick = useCallback(
     (num: number) => {
@@ -68,123 +64,85 @@ export function KenoBoard({ selected, onSelect, drawNumbers = [], hitNumbers = [
   const isRevealed = (num: number) => revealed.find((r) => r.num === num)?.revealed;
 
   return (
-    <div className="keno-grid relative">
-      {Array.from({ length: POOL_SIZE }, (_, i) => i + 1).map((num) => {
-        const selectedNow = isSelected(num);
-        const revealedNow = isRevealed(num);
-        const hit = isHit(num);
-        const isDrawn = drawNumbers.includes(num);
-        const confetti = showConfetti.includes(num);
+    <div className="w-full">
+      <div className="grid grid-cols-8 gap-1 sm:gap-2">
+        {Array.from({ length: POOL_SIZE }, (_, i) => i + 1).map((num) => {
+          const selectedNow = isSelected(num);
+          const revealedNow = isRevealed(num);
+          const hit = isHit(num);
+          const isDrawn = drawNumbers.includes(num);
+          const confetti = showConfetti.includes(num);
 
-        let classes = 'keno-number';
-        if (selectedNow) classes += ' selected';
-        else if (revealedNow) {
-          classes += hit ? ' hit' : ' drawn';
+          return (
+            <div key={num} className="relative aspect-square">
+              <button
+                onClick={() => handleClick(num)}
+                disabled={isDrawn && !revealedNow}
+                className={`
+                  w-full h-full rounded text-sm sm:text-base md:text-lg font-bold font-mono
+                  transition-all duration-200 flex items-center justify-center
+                  ${selectedNow
+                    ? 'bg-[#d4a853] text-black shadow-lg shadow-[#d4a853]/30 scale-105'
+                    : revealedNow
+                      ? hit
+                        ? 'bg-green-500 text-white shadow-lg shadow-green-500/40'
+                        : 'bg-red-900/60 text-red-300'
+                      : 'bg-[#1a1a24] text-[#7a7a85] hover:bg-[#252530] border border-[#252530]'
+                  }
+                  ${revealedNow ? 'animate-pop' : ''}
+                `}
+                style={{ fontFamily: "'Space Mono', monospace" }}
+              >
+                {num}
+              </button>
+
+              {confetti && (
+                <div className="absolute inset-0 pointer-events-none">
+                  {[...Array(8)].map((_, i) => (
+                    <div
+                      key={i}
+                      className="absolute w-1.5 h-1.5 rounded-full"
+                      style={{
+                        backgroundColor: ['#d4a853', '#f5d76e', '#ffd700', '#ffed4a'][i % 4],
+                        left: '50%',
+                        top: '50%',
+                        animation: `confetti-fly-${i} 0.8s ease-out forwards`,
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <style jsx>{`
+        @keyframes pop {
+          0% { transform: scale(0.5); opacity: 0; }
+          50% { transform: scale(1.15); }
+          100% { transform: scale(1); opacity: 1; }
         }
-
-        return (
-          <div key={num} className="relative">
-            <button
-              onClick={() => handleClick(num)}
-              disabled={isDrawn && !revealedNow}
-              className={`${classes} ${revealedNow ? 'animate-reveal' : ''}`}
-            >
-              {num}
-            </button>
-
-            {/* Confetti for hits */}
-            {confetti && (
-              <div className="absolute inset-0 pointer-events-none overflow-visible">
-                {[...Array(12)].map((_, i) => (
-                  <div
-                    key={i}
-                    className="absolute w-1 h-1 rounded-full"
-                    style={{
-                      backgroundColor: ['#d4a853', '#f5d76e', '#ffd700', '#ffed4a'][i % 4],
-                      left: '50%',
-                      top: '50%',
-                      animation: `confetti-${i} 0.8s ease-out forwards`,
-                    }}
-                  />
-                ))}
-              </div>
-            )}
-
-            <style jsx>{`
-              @keyframes confetti-0 {
-                0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
-                100% { transform: translate(-200%, -200%) scale(1); opacity: 0; }
-              }
-              @keyframes confetti-1 {
-                0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
-                100% { transform: translate(200%, -150%) scale(1); opacity: 0; }
-              }
-              @keyframes confetti-2 {
-                0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
-                100% { transform: translate(-150%, 200%) scale(1); opacity: 0; }
-              }
-              @keyframes confetti-3 {
-                0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
-                100% { transform: translate(150%, 200%) scale(1); opacity: 0; }
-              }
-              @keyframes confetti-4 {
-                0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
-                100% { transform: translate(-250%, -50%) scale(1); opacity: 0; }
-              }
-              @keyframes confetti-5 {
-                0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
-                100% { transform: translate(250%, -50%) scale(1); opacity: 0; }
-              }
-              @keyframes confetti-6 {
-                0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
-                100% { transform: translate(-100%, -300%) scale(1); opacity: 0; }
-              }
-              @keyframes confetti-7 {
-                0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
-                100% { transform: translate(100%, -300%) scale(1); opacity: 0; }
-              }
-              @keyframes confetti-8 {
-                0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
-                100% { transform: translate(-300%, 0%) scale(1); opacity: 0; }
-              }
-              @keyframes confetti-9 {
-                0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
-                100% { transform: translate(300%, 0%) scale(1); opacity: 0; }
-              }
-              @keyframes confetti-10 {
-                0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
-                100% { transform: translate(-200%, 200%) scale(1); opacity: 0; }
-              }
-              @keyframes confetti-11 {
-                0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
-                100% { transform: translate(200%, 200%) scale(1); opacity: 0; }
-              }
-              div:nth-child(12n+0) { animation-name: confetti-0; }
-              div:nth-child(12n+1) { animation-name: confetti-1; }
-              div:nth-child(12n+2) { animation-name: confetti-2; }
-              div:nth-child(12n+3) { animation-name: confetti-3; }
-              div:nth-child(12n+4) { animation-name: confetti-4; }
-              div:nth-child(12n+5) { animation-name: confetti-5; }
-              div:nth-child(12n+6) { animation-name: confetti-6; }
-              div:nth-child(12n+7) { animation-name: confetti-7; }
-              div:nth-child(12n+8) { animation-name: confetti-8; }
-              div:nth-child(12n+9) { animation-name: confetti-9; }
-              div:nth-child(12n+10) { animation-name: confetti-10; }
-              div:nth-child(12n+11) { animation-name: confetti-11; }
-
-              .animate-reveal {
-                animation: reveal-pop 0.3s ease-out forwards;
-              }
-
-              @keyframes reveal-pop {
-                0% { transform: scale(0.5); opacity: 0; }
-                50% { transform: scale(1.2); }
-                100% { transform: scale(1); opacity: 1; }
-              }
-            `}</style>
-          </div>
-        );
-      })}
+        .animate-pop {
+          animation: pop 0.3s ease-out forwards;
+        }
+        @keyframes confetti-fly-0 { to { transform: translate(-150%, -150%); opacity: 0; } }
+        @keyframes confetti-fly-1 { to { transform: translate(150%, -150%); opacity: 0; } }
+        @keyframes confetti-fly-2 { to { transform: translate(-150%, 150%); opacity: 0; } }
+        @keyframes confetti-fly-3 { to { transform: translate(150%, 150%); opacity: 0; } }
+        @keyframes confetti-fly-4 { to { transform: translate(-200%, -50%); opacity: 0; } }
+        @keyframes confetti-fly-5 { to { transform: translate(200%, -50%); opacity: 0; } }
+        @keyframes confetti-fly-6 { to { transform: translate(-200%, 50%); opacity: 0; } }
+        @keyframes confetti-fly-7 { to { transform: translate(200%, 50%); opacity: 0; } }
+        div:nth-child(8n+0) { animation: confetti-fly-0 0.8s ease-out forwards; }
+        div:nth-child(8n+1) { animation: confetti-fly-1 0.8s ease-out forwards; }
+        div:nth-child(8n+2) { animation: confetti-fly-2 0.8s ease-out forwards; }
+        div:nth-child(8n+3) { animation: confetti-fly-3 0.8s ease-out forwards; }
+        div:nth-child(8n+4) { animation: confetti-fly-4 0.8s ease-out forwards; }
+        div:nth-child(8n+5) { animation: confetti-fly-5 0.8s ease-out forwards; }
+        div:nth-child(8n+6) { animation: confetti-fly-6 0.8s ease-out forwards; }
+        div:nth-child(8n+7) { animation: confetti-fly-7 0.8s ease-out forwards; }
+      `}</style>
     </div>
   );
 }

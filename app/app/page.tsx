@@ -317,8 +317,8 @@ export default function Home() {
           <img
             src="/images/logo2.jpg"
             alt="Cookie Keno"
-            className="w-12 h-12 rounded-lg"
-            style={{ objectFit: 'cover' }}
+            className="w-16 h-16 rounded-xl border-2"
+            style={{ objectFit: 'cover', borderColor: 'var(--accent-gold)' }}
           />
           <div>
             <h1 className="text-xl tracking-widest gold-text">COOKIE KENO</h1>
