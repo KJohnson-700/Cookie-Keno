@@ -1,33 +1,43 @@
 'use client';
 
-import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useConnection } from '@solana/wallet-adapter-react';
-import { PublicKey, Transaction, VersionedTransaction } from '@solana/web3.js';
+import { PublicKey, Transaction, SystemProgram } from '@solana/web3.js';
+import { createMemoInstruction } from '@solana/spl-memo';
 
 import { WalletButton } from '@/components/WalletButton';
-import { Cookie } from '@/components/Cookie';
-import { Stats } from '@/components/Stats';
-import { UpgradeShop, UPGRADES, costFor } from '@/components/UpgradeShop';
-import { buildClickTransaction, confirmSignature } from '@/lib/clicker';
-import { CLICK_BURN_LAMPORTS, GOLDEN_COOKIE_CHANCE } from '@/lib/cookiechain';
+import { KenoBoard } from '@/components/KenoBoard';
+import { WagerPanel } from '@/components/WagerPanel';
+import { ResultsPanel } from '@/components/ResultsPanel';
+import { Leaderboard } from '@/components/Leaderboard';
+import { MultiplierBadge } from '@/components/MultiplierBadge';
+import {
+  MIN_PICKS,
+  MAX_PICKS,
+  MIN_WAGER,
+  MAX_WAGER,
+  deriveDraw,
+  countHits,
+  calculatePayout,
+} from '@/lib/keno';
 
 const TREASURY_PK = new PublicKey('5Nhcsv4ip2dF5fyN6of3NR98pv3wq75tWdPgqi9iDf29');
-const STORAGE_KEY = 'click-the-cookie:v1';
+const COOKIE_CHAIN_RPC = 'https://rpc.cookiescan.io';
+const COOK_NAME_MULTIPLIER = 1.5; // 50% bonus for .cook name holders
 
-// Direct window.nightly access — bypasses the wallet adapter for reliability.
-// We only trust a publicKey AFTER a successful connect() call, because
-// Nightly exposes a SystemProgram placeholder publicKey when not connected.
+const PLACEHOLDER_PK = new PublicKey('11111111111111111111111111111111');
+
+// Note: Payouts are calculated but not sent in this demo version.
+// For production, use a server-side API route to sign payout transactions.
+
 type NightlyProvider = {
   isNightly?: boolean;
   publicKey?: PublicKey | null;
   isConnected?: boolean;
   connect: () => Promise<{ publicKey: PublicKey }>;
   disconnect: () => Promise<void>;
-  signAndSendTransaction?: (tx: any, opts?: any) => Promise<{ signature: string }>;
   signTransaction: (tx: any) => Promise<any>;
 };
-
-const PLACEHOLDER_PK = new PublicKey('11111111111111111111111111111111');
 
 function getNightly(): NightlyProvider | null {
   if (typeof window === 'undefined') return null;
@@ -38,8 +48,6 @@ function isPlaceholder(pk: PublicKey | null | undefined): boolean {
   if (!pk) return true;
   try {
     if (pk.equals(PLACEHOLDER_PK)) return true;
-    // Also catch all-zero or all-equal bytes — some wallets use these as
-    // a placeholder before unlock / before chain selection.
     const b = pk.toBytes();
     const allSame = b.every((x) => x === b[0]);
     if (allSame) return true;
@@ -49,9 +57,6 @@ function isPlaceholder(pk: PublicKey | null | undefined): boolean {
   }
 }
 
-// Wait for Nightly to settle on a non-placeholder publicKey after connect().
-// connect() resolves before Nightly has updated its publicKey, so a single
-// read is racy. Poll for up to `timeoutMs`.
 async function waitForRealPublicKey(n: NightlyProvider, timeoutMs: number): Promise<PublicKey | null> {
   const start = Date.now();
   let last: PublicKey | null = null;
@@ -64,38 +69,30 @@ async function waitForRealPublicKey(n: NightlyProvider, timeoutMs: number): Prom
   return last;
 }
 
-type SaveState = {
-  cookies: number;
-  owned: Record<string, number>;
-  lastTick: number;
-  lifetimeBurned: number;
-  txCount: number;
-  goldenCount: number;
+type RoundResult = {
+  picks: number[];
+  draw: number[];
+  hits: number;
+  payout: number;
+  wager: number;
+  signature?: string;
+  blockhash?: string;
+  timestamp: number;
 };
-
-function defaultState(): SaveState {
-  return {
-    cookies: 0,
-    owned: {},
-    lastTick: Date.now(),
-    lifetimeBurned: 0,
-    txCount: 0,
-    goldenCount: 0,
-  };
-}
 
 export default function Home() {
   const { connection } = useConnection();
   const [nightlyReady, setNightlyReady] = useState(false);
   const [nightlyPk, setNightlyPk] = useState<PublicKey | null>(null);
-  const [save, setSave] = useState<SaveState>(defaultState);
+  const [selectedNumbers, setSelectedNumbers] = useState<number[]>([]);
+  const [wager, setWager] = useState(0.1);
+  const [hasCookName, setHasCookName] = useState(false); // Toggle for demo - real impl needs name service
   const [pending, setPending] = useState(false);
-  const [toast, setToast] = useState<{ kind: 'ok' | 'err' | 'gold'; msg: string; sig?: string } | null>(null);
-  const [goldenFlash, setGoldenFlash] = useState(false);
-  const lastClickAt = useRef<number>(0);
+  const [toast, setToast] = useState<{ kind: 'ok' | 'err' | 'win'; msg: string; sig?: string } | null>(null);
+  const [lastResult, setLastResult] = useState<RoundResult | null>(null);
+  const [roundHistory, setRoundHistory] = useState<RoundResult[]>([]);
 
-  // Poll for Nightly provider presence only (not the publicKey, since that
-  // can be a placeholder until connect() runs).
+  // Poll for Nightly provider
   useEffect(() => {
     let cancelled = false;
     const tick = () => {
@@ -113,60 +110,6 @@ export default function Home() {
 
   const publicKey = nightlyPk;
 
-  // Load save from localStorage, scoped to wallet
-  useEffect(() => {
-    if (!publicKey) {
-      setSave(defaultState());
-      return;
-    }
-    const key = `${STORAGE_KEY}:${publicKey.toBase58()}`;
-    try {
-      const raw = localStorage.getItem(key);
-      if (raw) {
-        const parsed = JSON.parse(raw) as SaveState;
-        const now = Date.now();
-        const cps = computeCps(parsed.owned);
-        const earned = ((now - parsed.lastTick) / 1000) * cps;
-        setSave({ ...parsed, cookies: parsed.cookies + earned, lastTick: now });
-      } else {
-        setSave(defaultState());
-      }
-    } catch {
-      setSave(defaultState());
-    }
-  }, [publicKey]);
-
-  // Persist on every change
-  useEffect(() => {
-    if (!publicKey) return;
-    const key = `${STORAGE_KEY}:${publicKey.toBase58()}`;
-    try {
-      localStorage.setItem(key, JSON.stringify(save));
-    } catch {}
-  }, [save, publicKey]);
-
-  // CPS tick
-  useEffect(() => {
-    const id = setInterval(() => {
-      setSave((s) => {
-        const cps = computeCps(s.owned);
-        if (cps <= 0) return { ...s, lastTick: Date.now() };
-        return { ...s, cookies: s.cookies + cps, lastTick: Date.now() };
-      });
-    }, 200);
-    return () => clearInterval(id);
-  }, []);
-
-  const perClick = useMemo(() => {
-    const base = 1;
-    const cursorBonus = (save.owned['cursor'] ?? 0) * 0.1;
-    return base + cursorBonus;
-  }, [save.owned]);
-
-  const cps = useMemo(() => computeCps(save.owned), [save.owned]);
-
-  const canClick = nightlyReady;
-
   const handleConnect = useCallback(async () => {
     const n = getNightly();
     if (!n) {
@@ -175,12 +118,8 @@ export default function Home() {
     }
     try {
       await n.connect();
-      // Just trust whatever n.publicKey is. If it's the placeholder, we'll
-      // show the raw value in the UI so the user can tell us what Nightly
-      // is actually returning. Don't gate on it.
       const pk = n.publicKey ?? PLACEHOLDER_PK;
       setNightlyPk(pk);
-      // If we got a real key, also flash a toast for confirmation
       if (!isPlaceholder(pk)) {
         setToast({ kind: 'ok', msg: `Connected: ${pk.toBase58().slice(0, 6)}…` });
         setTimeout(() => setToast(null), 2500);
@@ -201,19 +140,21 @@ export default function Home() {
     setNightlyPk(null);
   }, []);
 
-  const onClick = useCallback(async () => {
+  const canPlay = nightlyReady && publicKey && selectedNumbers.length >= MIN_PICKS && wager >= MIN_WAGER && !pending;
+
+  const handlePlay = useCallback(async () => {
+    if (!canPlay) return;
+
     const n = getNightly();
     if (!n) {
-      setToast({ kind: 'err', msg: 'Nightly not detected. Install from https://nightly.app' });
+      setToast({ kind: 'err', msg: 'Nightly not detected' });
       setTimeout(() => setToast(null), 3500);
       return;
     }
 
-    // Always re-read n.publicKey right before signing — Nightly updates
-    // it asynchronously, so the value at click time is the source of truth.
+    // Refresh public key
     let wallet = n.publicKey ?? publicKey ?? PLACEHOLDER_PK;
     if (isPlaceholder(wallet)) {
-      // Try a real connect one more time
       try {
         await n.connect();
         wallet = n.publicKey ?? wallet;
@@ -225,98 +166,115 @@ export default function Home() {
     }
     setNightlyPk(wallet);
 
-    // Throttle
-    const now = Date.now();
-    if (now - lastClickAt.current < 80) {
-      setSave((s) => ({ ...s, cookies: s.cookies + perClick, txCount: s.txCount + 1 }));
-      return;
-    }
-    lastClickAt.current = now;
-    if (pending) return;
     setPending(true);
 
-    const isGolden = Math.random() < GOLDEN_COOKIE_CHANCE;
-    const clickNumber = save.txCount + 1;
-
     try {
-      // Build the tx
-      const tx = buildClickTransaction({
-        wallet,
-        treasury: TREASURY_PK,
-        clickNumber,
-        burnLamports: CLICK_BURN_LAMPORTS,
-        isGolden,
-      });
+      // Build wager transaction
+      const lamports = Math.floor(wager * 1e9); // COOK has 9 decimals
+      const tx = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: wallet,
+          toPubkey: TREASURY_PK,
+          lamports,
+        }),
+        createMemoInstruction(`keno:v1 picks=${selectedNumbers.join(',')}`)
+      );
 
-      // Set a real recent blockhash from the Cookie Chain RPC
+      // Get recent blockhash
       const { blockhash } = await connection.getLatestBlockhash('confirmed');
       tx.recentBlockhash = blockhash;
+      tx.feePayer = wallet;
 
-      // Sign with Nightly (works on every Solana-like wallet)
+      // Sign with Nightly
       const signed = await n.signTransaction(tx);
 
-      // Submit via the connection (uses our Cookie Chain RPC)
+      // Send transaction
       const raw = signed.serialize();
       const signature = await connection.sendRawTransaction(raw, {
         skipPreflight: false,
         preflightCommitment: 'confirmed',
       });
 
-      // Optimistic UI update
-      setSave((s) => ({
-        ...s,
-        cookies: s.cookies + perClick + (isGolden ? 100 : 0),
-        lifetimeBurned: s.lifetimeBurned + CLICK_BURN_LAMPORTS,
-        txCount: s.txCount + 1,
-        goldenCount: s.goldenCount + (isGolden ? 1 : 0),
-        lastTick: Date.now(),
-      }));
+      // Derive draw from blockhash (provably fair)
+      const draw = deriveDraw(blockhash);
+      const hits = countHits(selectedNumbers, draw);
+      const rawPayout = calculatePayout(selectedNumbers.length, hits) * wager;
+      const multiplier = hasCookName ? COOK_NAME_MULTIPLIER : 1;
+      const payout = rawPayout * multiplier;
 
-      if (isGolden) {
-        setGoldenFlash(true);
-        setTimeout(() => setGoldenFlash(false), 1500);
-        setToast({ kind: 'gold', msg: `Golden Cookie! +100 🍪`, sig: signature });
+      const result: RoundResult = {
+        picks: selectedNumbers,
+        draw,
+        hits,
+        payout,
+        wager,
+        signature,
+        blockhash,
+        timestamp: Date.now(),
+      };
+
+      setLastResult(result);
+      setRoundHistory((prev) => [result, ...prev].slice(0, 10));
+
+      if (payout > 0) {
+        setToast({ kind: 'win', msg: `Won ${payout.toFixed(2)} COOK! (demo - payouts not sent)`, sig: signature });
       } else {
-        setToast({ kind: 'ok', msg: `Click #${clickNumber} confirmed`, sig: signature });
+        setToast({ kind: 'ok', msg: `Round complete - ${hits} hits`, sig: signature });
       }
-      setTimeout(() => setToast(null), 3500);
+      setTimeout(() => setToast(null), 4000);
 
-      // Background confirmation
-      confirmSignature(signature).catch(() => {});
+      // Clear selection for next round
+      setSelectedNumbers([]);
+
     } catch (err: any) {
-      const raw = String(err?.message ?? err ?? 'Click failed');
+      const raw = String(err?.message ?? err ?? 'Play failed');
       setToast({ kind: 'err', msg: raw.length > 160 ? raw.slice(0, 157) + '…' : raw });
       setTimeout(() => setToast(null), 5000);
     } finally {
       setPending(false);
     }
-  }, [pending, save.txCount, perClick, publicKey, connection]);
+  }, [canPlay, publicKey, selectedNumbers, wager, connection]);
 
-  const onBuy = useCallback(
-    (id: string) => {
-      const def = UPGRADES.find((u) => u.id === id);
-      if (!def) return;
-      const owned = save.owned[id] ?? 0;
-      const cost = costFor(def, owned);
-      if (save.cookies < cost) return;
-      setSave((s) => ({
-        ...s,
-        cookies: s.cookies - cost,
-        owned: { ...s.owned, [id]: owned + 1 },
-      }));
-    },
-    [save]
-  );
+  // Console log for testing without wallet
+  const handleDebugPlay = useCallback(() => {
+    if (selectedNumbers.length < MIN_PICKS) {
+      console.log('Select at least', MIN_PICKS, 'numbers');
+      return;
+    }
+    // Simulate a draw
+    const fakeBlockhash = Math.random().toString(36).slice(2, 34);
+    const draw = deriveDraw(fakeBlockhash);
+    const hits = countHits(selectedNumbers, draw);
+    const rawPayout = calculatePayout(selectedNumbers.length, hits) * wager;
+      const multiplier = hasCookName ? COOK_NAME_MULTIPLIER : 1;
+      const payout = rawPayout * multiplier;
+
+    const result: RoundResult = {
+      picks: selectedNumbers,
+      draw,
+      hits,
+      payout,
+      wager,
+      blockhash: fakeBlockhash,
+      timestamp: Date.now(),
+    };
+
+    setLastResult(result);
+    setRoundHistory((prev) => [result, ...prev].slice(0, 10));
+    setSelectedNumbers([]);
+    console.log('Debug play:', result);
+  }, [selectedNumbers, wager]);
 
   return (
-    <main className="min-h-screen flex flex-col bg-[#07111f] text-slate-100">
-      <header className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-slate-800/80 backdrop-blur bg-[#0b1324]/80">
+    <main className="min-h-screen flex flex-col text-slate-100">
+      <header className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-slate-800/40 backdrop-blur-md bg-slate-900/40">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-amber-500/20 grid place-items-center text-amber-300 text-lg">
-            🍪
+            🎰
           </div>
           <div>
-            <div className="font-semibold tracking-tight">Click The Cookie</div>
+            <div className="font-semibold tracking-tight text-lg">Cookie Keno</div>
+            <div className="text-[10px] text-slate-500 font-mono">ON CHAIN • PROVABLY FAIR</div>
             <div className="text-[11px] text-slate-500 -mt-0.5">
               on{' '}
               <a className="text-amber-300 hover:underline" href="https://www.cookiechain.wtf" target="_blank" rel="noreferrer">
@@ -325,78 +283,115 @@ export default function Home() {
             </div>
           </div>
         </div>
-        <WalletButton
-          publicKey={publicKey}
-          nightlyReady={nightlyReady}
-          onConnect={handleConnect}
-          onDisconnect={handleDisconnect}
-        />
+        <div className="flex items-center gap-3">
+          {publicKey && (
+            <button
+              onClick={() => setHasCookName(!hasCookName)}
+              className="transition-opacity hover:opacity-80"
+            >
+              <MultiplierBadge
+                active={hasCookName}
+                label=".cook holder"
+                multiplier={COOK_NAME_MULTIPLIER}
+              />
+            </button>
+          )}
+          <WalletButton
+            publicKey={publicKey}
+            nightlyReady={nightlyReady}
+            onConnect={handleConnect}
+            onDisconnect={handleDisconnect}
+          />
+        </div>
       </header>
 
-      {/* Debug strip — only visible when the address looks like a placeholder */}
-      {typeof window !== 'undefined' && publicKey && isPlaceholder(publicKey) && (
-        <div className="bg-red-950/60 border-b border-red-500/40 px-4 py-2 text-xs text-red-200 font-mono">
-          DEBUG: Nightly publicKey = <span className="text-amber-300">{publicKey.toBase58()}</span>
-          {' · '}isConnected = {String((window as any).nightly?.solana?.isConnected)}
-          {' · '}Click the cookie; the actual error from the chain will show what Nightly is doing.
-        </div>
-      )}
-
-      <section className="flex-1 flex flex-col items-center justify-start gap-6 px-4 py-8 sm:py-12">
-        <Stats
-          clicks={Math.floor(save.cookies)}
-          burned={save.lifetimeBurned}
-          cps={cps}
-          perClick={perClick}
-          goldenCount={save.goldenCount}
-          isGolden={goldenFlash}
-        />
-
-        <div className="relative">
-          <Cookie disabled={!canClick} onClick={onClick} />
-          {goldenFlash && (
-            <div className="pointer-events-none absolute inset-0 rounded-full ring-4 ring-amber-300 animate-pulse" />
-          )}
+      <section className="flex-1 flex flex-col items-start gap-6 px-4 py-6 sm:py-8 max-w-3xl mx-auto w-full">
+        {/* Selection info */}
+        <div className="w-full flex items-center justify-between text-sm">
+          <span className="text-slate-400">
+            Selected: <span className="text-amber-400 font-semibold">{selectedNumbers.length}</span> / {MAX_PICKS}
+          </span>
+          <button
+            onClick={() => setSelectedNumbers([])}
+            className="text-xs text-slate-500 hover:text-slate-300"
+          >
+            Clear
+          </button>
         </div>
 
-        <div className="text-center text-xs text-slate-500 max-w-md">
-          {!nightlyReady ? (
-            <span className="text-amber-300/80">
-              Install{' '}
-              <a className="underline" href="https://nightly.app" target="_blank" rel="noreferrer">
-                Nightly
-              </a>{' '}
-              and refresh.
-            </span>
-          ) : publicKey ? (
-            <>
-              Every click sends a real on-chain tx on Cookie Chain — burns a tiny amount of COOK and writes a memo.
-              <br />
-              0.5% chance to hit a <span className="text-amber-300">Golden Cookie</span> for a bonus.
-            </>
-          ) : (
-            <>
-              Nightly detected.{' '}
-              <span className="text-amber-300">Click the cookie</span> to connect and start clicking.
-            </>
-          )}
+        {/* Keno Board */}
+        <div className="w-full">
+          <KenoBoard
+            selected={selectedNumbers}
+            onSelect={setSelectedNumbers}
+            drawNumbers={lastResult?.draw}
+            hitNumbers={lastResult ? lastResult.picks.filter(p => lastResult.draw.includes(p)) : []}
+          />
         </div>
 
-        {publicKey && (
-          <div className="w-full max-w-2xl">
-            <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500 mb-2 text-center">
-              Upgrades
+        {/* Wager Panel */}
+        <div className="w-full">
+          <WagerPanel
+            wager={wager}
+            onWagerChange={setWager}
+            onPlay={publicKey ? handlePlay : handleDebugPlay}
+            disabled={selectedNumbers.length < MIN_PICKS}
+            pending={pending}
+          />
+        </div>
+
+        {!publicKey && (
+          <div className="w-full text-center text-xs text-slate-500 bg-slate-800/40 rounded-lg py-2">
+            Connect wallet to play for real COOK — or play debug mode (no tx)
+          </div>
+        )}
+
+        {/* Last Result */}
+        {lastResult && (
+          <div className="w-full">
+            <ResultsPanel
+              picks={lastResult.picks}
+              draw={lastResult.draw}
+              hits={lastResult.hits}
+              payout={lastResult.payout}
+              wager={lastResult.wager}
+              signature={lastResult.signature}
+              blockhash={lastResult.blockhash}
+            />
+          </div>
+        )}
+
+        {/* History */}
+        {roundHistory.length > 1 && (
+          <div className="w-full">
+            <div className="text-xs uppercase tracking-wider text-slate-500 mb-2">Recent Rounds</div>
+            <div className="space-y-1">
+              {roundHistory.slice(1).map((r, i) => (
+                <div key={r.timestamp} className="flex items-center justify-between text-xs bg-slate-800/40 rounded px-3 py-2">
+                  <span className="text-slate-400">
+                    {r.picks.length} picks → {r.hits} hits
+                  </span>
+                  <span className={r.payout > 0 ? 'text-green-400' : 'text-red-400'}>
+                    {r.payout > 0 ? '+' : ''}{r.payout.toFixed(2)} COOK
+                  </span>
+                </div>
+              ))}
             </div>
-            <UpgradeShop owned={save.owned} cookies={save.cookies} onBuy={onBuy} />
           </div>
         )}
       </section>
 
-      <footer className="text-center text-[11px] text-slate-600 py-4 border-t border-slate-800/60">
-        Built for the Cookie Chain cApp program. MIT licensed.
-        <a className="ml-2 text-amber-300 hover:underline" href="https://github.com/" target="_blank" rel="noreferrer">
-          GitHub
-        </a>
+      {/* Leaderboard - full width below main game */}
+      <section className="px-4 pb-6 max-w-3xl mx-auto w-full">
+        <Leaderboard />
+      </section>
+
+      <footer className="text-center text-[11px] text-slate-500 py-4 border-t border-slate-800/40 bg-slate-900/20">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4">
+          <span>🎰 Pick 1-10 • 8 drawn • Win based on hits</span>
+          <span className="hidden sm:inline text-slate-700">•</span>
+          <span className="text-slate-600">Treasury: <code className="text-amber-400/60">5Nhcsv4ip2dF5...</code></span>
+        </div>
       </footer>
 
       {toast && (
@@ -405,8 +400,8 @@ export default function Home() {
             'fixed bottom-6 right-6 px-4 py-3 rounded-xl shadow-2xl border max-w-sm',
             toast.kind === 'err'
               ? 'bg-red-950/80 border-red-500/40 text-red-100'
-              : toast.kind === 'gold'
-              ? 'bg-amber-500/15 border-amber-400/60 text-amber-100'
+              : toast.kind === 'win'
+              ? 'bg-green-500/15 border-green-400/60 text-green-100'
               : 'bg-slate-900/80 border-slate-700 text-slate-100',
           ].join(' ')}
         >
@@ -425,13 +420,4 @@ export default function Home() {
       )}
     </main>
   );
-}
-
-function computeCps(owned: Record<string, number>): number {
-  let total = 0;
-  for (const u of UPGRADES) {
-    const count = owned[u.id] ?? 0;
-    if (count > 0) total += u.cps * count;
-  }
-  return total;
 }

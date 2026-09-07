@@ -1,30 +1,122 @@
 @import "tailwindcss";
 
+/* Anti-AI slop design: distinctive typography, intentional design */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@400;500;600;700&display=swap');
+
 :root {
   --background: #07111f;
   --foreground: #e2e8f0;
+  --accent: #f59e0b;
+  --accent-glow: rgba(245, 158, 11, 0.3);
 }
 
-@keyframes wiggle {
-  0%, 100% { transform: rotate(0deg); }
-  25% { transform: rotate(-3deg); }
-  75% { transform: rotate(3deg); }
+/* Custom animations */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-4px); }
 }
 
-html, body {
-  background: var(--background);
-  color: var(--foreground);
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 20px var(--accent-glow); }
+  50% { box-shadow: 0 0 40px var(--accent-glow), 0 0 60px var(--accent-glow); }
 }
 
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes number-pop {
+  0% { transform: scale(0.8); opacity: 0; }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes win-flash {
+  0% { background-color: rgba(34, 197, 94, 0.3); }
+  100% { background-color: transparent; }
+}
+
+/* Anti-AI: distinctive typography */
+html {
+  font-family: 'Outfit', system-ui, sans-serif;
+}
+
+.font-mono, code, pre, .mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Background with subtle texture */
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   background:
-    radial-gradient(ellipse at top, rgba(245, 165, 36, 0.06), transparent 50%),
-    radial-gradient(ellipse at bottom, rgba(59, 130, 246, 0.05), transparent 50%),
-    #07111f;
+    radial-gradient(ellipse at 20% 0%, rgba(245, 158, 11, 0.08), transparent 40%),
+    radial-gradient(ellipse at 80% 100%, rgba(59, 130, 246, 0.06), transparent 40%),
+    radial-gradient(circle at 50% 50%, rgba(30, 41, 59, 0.5), transparent 70%),
+    linear-gradient(180deg, #07111f 0%, #0f172a 100%);
   background-attachment: fixed;
+  min-height: 100vh;
 }
 
+/* Card styling */
+.card {
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.6), rgba(15, 23, 42, 0.8));
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+/* Number button styles */
+.keno-number {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.keno-number:hover:not(:disabled) {
+  transform: translateY(-2px) scale(1.05);
+}
+
+.keno-number.selected {
+  box-shadow: 0 0 20px var(--accent-glow), inset 0 0 20px rgba(245, 158, 11, 0.2);
+}
+
+.keno-number.drawn {
+  animation: number-pop 0.4s ease-out forwards;
+}
+
+/* Win animation */
+.win-flash {
+  animation: win-flash 0.6s ease-out;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.5);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.2);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.3);
+}
+
+/* Wallet adapter overrides */
 .wallet-adapter-modal-title {
   color: #0b1324 !important;
+}
+
+/* Focus styles */
+*:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Selection */
+::selection {
+  background: rgba(245, 158, 11, 0.3);
+  color: #fff;
 }

@@ -37,7 +37,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# anchor / rust (we're not using this for v1, but keep ignore rules in case we add it later)
+# anchor / rust
 target/
 **/target/
 **/*.rs.bk
@@ -62,8 +62,14 @@ build.stderr.log
 .*.unused
 node_modules*.backup/
 node_modules.fresh/
+.next.old/
 
 # treasury keypair (NEVER commit private keys)
 app/scripts/treasury.json
 app/scripts/.treasury*
+**/treasury.json
 
+# sensitive data
+*.seed
+*.mnemonic
+*.private*
