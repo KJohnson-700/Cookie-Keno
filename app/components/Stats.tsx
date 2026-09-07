@@ -5,6 +5,7 @@ type Props = {
   burned: number; // in lamports
   cps: number; // cookies per second
   perClick: number;
+  goldenCount: number;
   isGolden?: boolean;
 };
 
@@ -16,13 +17,14 @@ function fmt(n: number, decimals = 0) {
   return n.toFixed(decimals);
 }
 
-export function Stats({ clicks, burned, cps, perClick, isGolden }: Props) {
+export function Stats({ clicks, burned, cps, perClick, goldenCount, isGolden }: Props) {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full max-w-2xl">
+    <div className="grid grid-cols-2 md:grid-cols-5 gap-3 w-full max-w-3xl">
       <Card label="Cookies" value={fmt(clicks)} accent />
       <Card label="Per click" value={fmt(perClick, perClick < 10 ? 1 : 0)} />
       <Card label="Per second" value={fmt(cps, 1)} />
       <Card label="COOK burned" value={fmt(burned / 1e9, 6)} suffix="COOK" />
+      <Card label="Golden 🍪" value={fmt(goldenCount)} accent={goldenCount > 0} />
     </div>
   );
 }

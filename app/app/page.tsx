@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
-import { useConnection, useWallet } from '@solana/wallet-adapter-react';
-import { PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { useConnection } from '@solana/wallet-adapter-react';
+import { PublicKey } from '@solana/web3.js';
 
 import { WalletButton } from '@/components/WalletButton';
 import { Cookie } from '@/components/Cookie';
@@ -11,7 +11,6 @@ import { UpgradeShop, UPGRADES, costFor } from '@/components/UpgradeShop';
 import {
   buildClickTransaction,
   confirmSignature,
-  makeConnection,
 } from '@/lib/clicker';
 import {
   CLICK_BURN_LAMPORTS,
@@ -21,12 +20,31 @@ import {
 const TREASURY_PK = new PublicKey('5Nhcsv4ip2dF5fyN6of3NR98pv3wq75tWdPgqi9iDf29');
 const STORAGE_KEY = 'click-the-cookie:v1';
 
+// Direct window.nightly access — bypasses the wallet adapter so we don't
+// depend on its connection state machine (which was causing click-blocking
+// when Nightly was loaded but not formally "connected").
+type NightlyProvider = {
+  isNightly?: boolean;
+  publicKey?: PublicKey | null;
+  isConnected?: boolean;
+  connect: () => Promise<{ publicKey: PublicKey }>;
+  disconnect: () => Promise<void>;
+  signAndSendTransaction: (tx: any, opts?: any) => Promise<{ signature: string }>;
+  signTransaction: (tx: any) => Promise<any>;
+};
+
+function getNightly(): NightlyProvider | null {
+  if (typeof window === 'undefined') return null;
+  return (window as any).nightly?.solana ?? null;
+}
+
 type SaveState = {
   cookies: number;
   owned: Record<string, number>;
-  lastTick: number; // unix ms
-  lifetimeBurned: number; // lamports
+  lastTick: number;
+  lifetimeBurned: number;
   txCount: number;
+  goldenCount: number;
 };
 
 function defaultState(): SaveState {
@@ -36,19 +54,52 @@ function defaultState(): SaveState {
     lastTick: Date.now(),
     lifetimeBurned: 0,
     txCount: 0,
+    goldenCount: 0,
   };
 }
 
 export default function Home() {
-  const { publicKey, connected } = useWallet();
   const { connection } = useConnection();
+  const [nightlyPk, setNightlyPk] = useState<PublicKey | null>(null);
+  const [nightlyReady, setNightlyReady] = useState(false);
   const [save, setSave] = useState<SaveState>(defaultState);
   const [pending, setPending] = useState(false);
   const [toast, setToast] = useState<{ kind: 'ok' | 'err' | 'gold'; msg: string; sig?: string } | null>(null);
   const [goldenFlash, setGoldenFlash] = useState(false);
   const lastClickAt = useRef<number>(0);
 
-  // Load save from localStorage on mount, scoped to wallet
+  // Poll for Nightly provider; update when it appears, when its key changes,
+  // or when the user connects/disconnects from inside Nightly.
+  useEffect(() => {
+    let cancelled = false;
+    const tick = () => {
+      if (cancelled) return;
+      const n = getNightly();
+      if (n) {
+        setNightlyReady(true);
+        const pk = n.publicKey ?? null;
+        setNightlyPk((prev) => {
+          const a = prev?.toBase58() ?? null;
+          const b = pk?.toBase58() ?? null;
+          if (a === b) return prev;
+          return pk;
+        });
+      } else {
+        setNightlyReady(false);
+        setNightlyPk(null);
+      }
+    };
+    tick();
+    const id = setInterval(tick, 500);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, []);
+
+  const publicKey = nightlyPk;
+
+  // Load save from localStorage, scoped to wallet
   useEffect(() => {
     if (!publicKey) {
       setSave(defaultState());
@@ -59,7 +110,6 @@ export default function Home() {
       const raw = localStorage.getItem(key);
       if (raw) {
         const parsed = JSON.parse(raw) as SaveState;
-        // Catch up on cps over the time we were away
         const now = Date.now();
         const cps = computeCps(parsed.owned);
         const earned = ((now - parsed.lastTick) / 1000) * cps;
@@ -81,7 +131,7 @@ export default function Home() {
     } catch {}
   }, [save, publicKey]);
 
-  // Tick for cps accumulation
+  // CPS tick
   useEffect(() => {
     const id = setInterval(() => {
       setSave((s) => {
@@ -101,47 +151,63 @@ export default function Home() {
 
   const cps = useMemo(() => computeCps(save.owned), [save.owned]);
 
+  // The cookie is enabled if Nightly is loaded into the browser. The user may
+  // not be formally connected yet — we call connect() lazily on first click.
+  const canClick = nightlyReady;
+
   const onClick = useCallback(async () => {
-    if (!connected || !publicKey) {
-      setToast({ kind: 'err', msg: 'Connect Nightly to click' });
-      setTimeout(() => setToast(null), 2500);
+    const n = getNightly();
+    if (!n) {
+      setToast({ kind: 'err', msg: 'Nightly not detected. Install from https://nightly.app' });
+      setTimeout(() => setToast(null), 3500);
       return;
     }
-    // Throttle client-side: 80ms min between click tx submissions to keep the chain happy.
+
+    // Lazy connect on first click
+    let wallet = n.publicKey ?? null;
+    if (!wallet) {
+      try {
+        const r = await n.connect();
+        wallet = r.publicKey;
+        setNightlyPk(wallet);
+      } catch (e: any) {
+        setToast({ kind: 'err', msg: 'Connect cancelled' });
+        setTimeout(() => setToast(null), 3500);
+        return;
+      }
+    }
+
+    // Throttle
     const now = Date.now();
     if (now - lastClickAt.current < 80) {
-      // Just give the user a visual + offline cookie (free click, no tx)
-      setSave((s) => ({ ...s, cookies: s.cookies + perClick, txCount: s.txCount }));
+      setSave((s) => ({ ...s, cookies: s.cookies + perClick, txCount: s.txCount + 1 }));
       return;
     }
     lastClickAt.current = now;
-
-    if (pending) return; // one in flight at a time
+    if (pending) return;
     setPending(true);
 
     const isGolden = Math.random() < GOLDEN_COOKIE_CHANCE;
     const clickNumber = save.txCount + 1;
     try {
       const tx = buildClickTransaction({
-        wallet: publicKey,
+        wallet,
         treasury: TREASURY_PK,
         clickNumber,
         burnLamports: CLICK_BURN_LAMPORTS,
         isGolden,
       });
-      const { signature } = await (window as any).nightly?.solana?.signAndSendTransaction
-        ? await (window as any).nightly.solana.signAndSendTransaction(tx)
-        : await (async () => {
-            // Fallback: sign via wallet adapter then send via connection
-            throw new Error('Use Nightly wallet');
-          })();
+      const { signature } = await n.signAndSendTransaction(tx, {
+        // Pre-flight simulation so we don't waste a tx on a guaranteed failure
+        // signers: [],
+      });
 
-      // Optimistic UI update — give the cookies now, confirm async
       setSave((s) => ({
         ...s,
         cookies: s.cookies + perClick + (isGolden ? 100 : 0),
         lifetimeBurned: s.lifetimeBurned + CLICK_BURN_LAMPORTS,
         txCount: s.txCount + 1,
+        goldenCount: s.goldenCount + (isGolden ? 1 : 0),
         lastTick: Date.now(),
       }));
 
@@ -154,15 +220,15 @@ export default function Home() {
       }
       setTimeout(() => setToast(null), 3500);
 
-      // Confirm in the background (don't block)
       confirmSignature(signature).catch(() => {});
     } catch (err: any) {
-      setToast({ kind: 'err', msg: err?.message ?? 'Click failed' });
+      const msg = String(err?.message ?? err ?? 'Click failed');
+      setToast({ kind: 'err', msg: msg.length > 120 ? msg.slice(0, 117) + '…' : msg });
       setTimeout(() => setToast(null), 3500);
     } finally {
       setPending(false);
     }
-  }, [connected, publicKey, pending, save.txCount, perClick]);
+  }, [pending, save.txCount, perClick]);
 
   const onBuy = useCallback(
     (id: string) => {
@@ -176,8 +242,6 @@ export default function Home() {
         cookies: s.cookies - cost,
         owned: { ...s.owned, [id]: owned + 1 },
       }));
-      // Off-chain buy: store upgrade tx as a memo'd on-chain call in the future.
-      // For v1 it's free upgrades after you earn enough cookies.
     },
     [save]
   );
@@ -196,7 +260,18 @@ export default function Home() {
             </div>
           </div>
         </div>
-        <WalletButton />
+        <WalletButton publicKey={publicKey} nightlyReady={nightlyReady} onConnect={async () => {
+          const n = getNightly();
+          if (!n) return;
+          try {
+            const r = await n.connect();
+            setNightlyPk(r.publicKey);
+          } catch {}
+        }} onDisconnect={async () => {
+          const n = getNightly();
+          if (n) try { await n.disconnect(); } catch {}
+          setNightlyPk(null);
+        }} />
       </header>
 
       <section className="flex-1 flex flex-col items-center justify-start gap-6 px-4 py-8 sm:py-12">
@@ -205,29 +280,36 @@ export default function Home() {
           burned={save.lifetimeBurned}
           cps={cps}
           perClick={perClick}
+          goldenCount={save.goldenCount}
           isGolden={goldenFlash}
         />
 
         <div className="relative">
-          <Cookie disabled={!connected} onClick={onClick} />
+          <Cookie disabled={!canClick} onClick={onClick} />
           {goldenFlash && (
             <div className="pointer-events-none absolute inset-0 rounded-full ring-4 ring-amber-300 animate-pulse" />
           )}
         </div>
 
         <div className="text-center text-xs text-slate-500 max-w-md">
-          {connected ? (
+          {!nightlyReady ? (
+            <span className="text-amber-300/80">
+              Install <a className="underline" href="https://nightly.app" target="_blank" rel="noreferrer">Nightly</a> and refresh.
+            </span>
+          ) : publicKey ? (
             <>
               Every click sends a real on-chain tx on Cookie Chain — burns a tiny amount of COOK and writes a memo.
               <br />
               0.5% chance to hit a <span className="text-amber-300">Golden Cookie</span> for a bonus.
             </>
           ) : (
-            <>Connect your Nightly wallet to start clicking. Every click is a real on-chain transaction.</>
+            <>
+              Nightly detected. <span className="text-amber-300">Click the cookie</span> to connect and start clicking.
+            </>
           )}
         </div>
 
-        {connected && (
+        {publicKey && (
           <div className="w-full max-w-2xl">
             <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500 mb-2 text-center">
               Upgrades
