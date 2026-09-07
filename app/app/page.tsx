@@ -175,14 +175,16 @@ export default function Home() {
     }
     try {
       await n.connect();
-      // connect() resolves before Nightly updates n.publicKey. Poll.
-      const pk = await waitForRealPublicKey(n, 5000);
-      if (!pk) {
-        throw new Error(
-          'Nightly stayed on the placeholder address. Open the Nightly extension, make sure your wallet is unlocked and on Cookie Chain, then click Connect again.'
-        );
-      }
+      // Just trust whatever n.publicKey is. If it's the placeholder, we'll
+      // show the raw value in the UI so the user can tell us what Nightly
+      // is actually returning. Don't gate on it.
+      const pk = n.publicKey ?? PLACEHOLDER_PK;
       setNightlyPk(pk);
+      // If we got a real key, also flash a toast for confirmation
+      if (!isPlaceholder(pk)) {
+        setToast({ kind: 'ok', msg: `Connected: ${pk.toBase58().slice(0, 6)}…` });
+        setTimeout(() => setToast(null), 2500);
+      }
     } catch (e: any) {
       setToast({ kind: 'err', msg: e?.message ?? 'Connect failed' });
       setTimeout(() => setToast(null), 5000);
@@ -207,25 +209,21 @@ export default function Home() {
       return;
     }
 
-    // Lazy connect if not already connected
-    let wallet = publicKey;
-    if (!wallet || isPlaceholder(wallet)) {
+    // Always re-read n.publicKey right before signing — Nightly updates
+    // it asynchronously, so the value at click time is the source of truth.
+    let wallet = n.publicKey ?? publicKey ?? PLACEHOLDER_PK;
+    if (isPlaceholder(wallet)) {
+      // Try a real connect one more time
       try {
         await n.connect();
-        const pk = await waitForRealPublicKey(n, 5000);
-        if (!pk) {
-          throw new Error(
-            'Nightly stayed on the placeholder. Unlock your wallet in the Nightly extension and switch to Cookie Chain, then click again.'
-          );
-        }
-        wallet = pk;
-        setNightlyPk(wallet);
+        wallet = n.publicKey ?? wallet;
       } catch (e: any) {
-        setToast({ kind: 'err', msg: e?.message ?? 'Connect cancelled' });
+        setToast({ kind: 'err', msg: e?.message ?? 'Connect failed' });
         setTimeout(() => setToast(null), 5000);
         return;
       }
     }
+    setNightlyPk(wallet);
 
     // Throttle
     const now = Date.now();
@@ -334,6 +332,15 @@ export default function Home() {
           onDisconnect={handleDisconnect}
         />
       </header>
+
+      {/* Debug strip — only visible when the address looks like a placeholder */}
+      {typeof window !== 'undefined' && publicKey && isPlaceholder(publicKey) && (
+        <div className="bg-red-950/60 border-b border-red-500/40 px-4 py-2 text-xs text-red-200 font-mono">
+          DEBUG: Nightly publicKey = <span className="text-amber-300">{publicKey.toBase58()}</span>
+          {' · '}isConnected = {String((window as any).nightly?.solana?.isConnected)}
+          {' · '}Click the cookie; the actual error from the chain will show what Nightly is doing.
+        </div>
+      )}
 
       <section className="flex-1 flex flex-col items-center justify-start gap-6 px-4 py-8 sm:py-12">
         <Stats
