@@ -255,12 +255,17 @@ export default function Home() {
         setToast({ kind: 'win', msg: `Won ${payout.toFixed(2)} COOK!${jackpotMsg} (demo)`, sig: signature });
         setCelebrationType(jackpotWin ? 'jackpot' : 'win');
         setShowCelebration(true);
-        setShowResultPopup(true);
         setTimeout(() => setShowCelebration(false), 3000);
-      } else {
-        setShowResultPopup(true);
-        setToast({ kind: 'ok', msg: `Round complete - ${hits} hits`, sig: signature });
       }
+
+      // Delay popup until after reveal animation (8 numbers × 300ms = 2400ms)
+      setTimeout(() => {
+        setShowResultPopup(true);
+        if (payout <= 0) {
+          setToast({ kind: 'ok', msg: `Round complete - ${hits} hits`, sig: signature });
+        }
+      }, 2500);
+
       setTimeout(() => setToast(null), 4000);
 
       setSelectedNumbers([]);
@@ -311,6 +316,19 @@ export default function Home() {
 
     setLastResult(result);
     setRoundHistory((prev) => [result, ...prev].slice(0, 50));
+
+    // Show celebration for wins
+    if (payout > 0) {
+      setCelebrationType(jackpotWin ? 'jackpot' : 'win');
+      setShowCelebration(true);
+      setTimeout(() => setShowCelebration(false), 3000);
+    }
+
+    // Delay popup until after reveal animation (8 numbers × 300ms = 2400ms)
+    setTimeout(() => {
+      setShowResultPopup(true);
+    }, 2500);
+
     setSelectedNumbers([]);
     console.log('Debug play:', result);
   }, [selectedNumbers, wager, jackpot, hasCookName]);
