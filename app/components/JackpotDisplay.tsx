@@ -10,7 +10,7 @@ export function JackpotDisplay({ jackpot, triggered }: JackpotDisplayProps) {
     <div className={`jackpot-card rounded-xl p-4 transition-all duration-500 ${triggered ? 'animate-pulse' : ''}`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <span className="text-3xl">🎰</span>
+          <div className="text-2xl font-bold tracking-widest" style={{ color: 'var(--accent-gold)' }}>JACKPOT</div>
           <div>
             <div className="text-xs uppercase tracking-widest" style={{ color: 'var(--accent-gold)' }}>Progressive Jackpot</div>
             <div className="text-2xl font-bold font-mono gold-text">
@@ -20,7 +20,7 @@ export function JackpotDisplay({ jackpot, triggered }: JackpotDisplayProps) {
         </div>
         {triggered && (
           <div className="text-center">
-            <div className="text-4xl animate-bounce">🎉</div>
+            <div className="text-2xl font-bold animate-bounce" style={{ color: 'var(--accent-gold)' }}>★ WIN ★</div>
             <div className="text-xs font-bold gold-text tracking-widest">JACKPOT!</div>
           </div>
         )}
