@@ -356,55 +356,6 @@ export default function Home() {
       <section className="flex-1 flex flex-col items-start gap-4 px-4 pb-24 max-w-xl mx-auto w-full">
         <JackpotDisplay jackpot={jackpot} triggered={jackpotTriggered} />
 
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            onClick={() => setActiveTab('leaderboard')}
-            style={{ flex: 1, textAlign: 'center', padding: '9px 0', border: `1px solid ${activeTab === 'leaderboard' ? 'var(--accent-gold)' : 'var(--border-subtle)'}`, borderRadius: 9, background: 'var(--bg-card)', fontFamily: "'Bebas Neue', sans-serif", fontSize: 13, letterSpacing: '.16em', color: activeTab === 'leaderboard' ? 'var(--accent-gold)' : 'var(--text-secondary)', cursor: 'pointer' }}
-          >
-            LEADERBOARD
-          </button>
-          <button
-            onClick={() => setActiveTab('history')}
-            style={{ flex: 1, textAlign: 'center', padding: '9px 0', border: `1px solid ${activeTab === 'history' ? 'var(--accent-gold)' : 'var(--border-subtle)'}`, borderRadius: 9, background: 'var(--bg-card)', fontFamily: "'Bebas Neue', sans-serif", fontSize: 13, letterSpacing: '.16em', color: activeTab === 'history' ? 'var(--accent-gold)' : 'var(--text-secondary)', cursor: 'pointer' }}
-          >
-            MY ROUNDS
-          </button>
-          <button
-            onClick={() => setActiveTab('howto')}
-            style={{ width: 42, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${activeTab === 'howto' ? 'var(--accent-gold)' : 'var(--border-subtle)'}`, borderRadius: 9, background: 'var(--bg-card)', fontFamily: "'Bebas Neue', sans-serif", fontSize: 14, color: activeTab === 'howto' ? 'var(--accent-gold)' : 'var(--text-secondary)', cursor: 'pointer' }}
-          >
-            ?
-          </button>
-        </div>
-
-        {activeTab === 'howto' ? (
-          <HowToPlay />
-        ) : activeTab === 'history' ? (
-          <div className="w-full">
-            {roundHistory.length === 0 ? (
-              <div style={{ padding: 34, textAlign: 'center', fontSize: 11, color: 'var(--text-muted)' }}>
-                No rounds yet. Pick numbers and play.
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-                {roundHistory.slice(0, 20).map((r, i) => (
-                  <div key={r.timestamp} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '10px 12px', border: '1px solid #1e1e28', borderRadius: 10, background: 'var(--bg-card)' }}>
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                      <span style={{ fontSize: 11, color: 'var(--text-primary)' }}>{r.hits} / 8 HITS</span>
-                      <span style={{ fontSize: 8.5, letterSpacing: '.08em', color: 'var(--text-muted)' }}>{r.picks.length} picks • {r.wager.toFixed(1)} COOK</span>
-                    </div>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: r.payout > 0 ? '#22c55e' : '#ef4444' }}>
-                      {r.payout > 0 ? '+' : ''}{r.payout.toFixed(2)} COOK
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        ) : (
-          <Leaderboard />
-        )}
-
         <div className="w-full flex items-center justify-between">
           <span style={{ fontSize: 10, letterSpacing: '.14em', color: 'var(--text-secondary)' }}>SELECTED <span style={{ color: 'var(--accent-gold)', fontWeight: 700 }}>{selectedNumbers.length}</span> / {MAX_PICKS}</span>
           <button onClick={() => setSelectedNumbers([])} style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 13, letterSpacing: '.16em', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>CLEAR</button>
@@ -443,7 +394,56 @@ export default function Home() {
           </div>
         )}
 
-        <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+          <button
+            onClick={() => setActiveTab('leaderboard')}
+            style={{ flex: 1, textAlign: 'center', padding: '9px 0', border: `1px solid ${activeTab === 'leaderboard' ? 'var(--accent-gold)' : 'var(--border-subtle)'}`, borderRadius: 9, background: 'var(--bg-card)', fontFamily: "'Bebas Neue', sans-serif", fontSize: 13, letterSpacing: '.16em', color: activeTab === 'leaderboard' ? 'var(--accent-gold)' : 'var(--text-secondary)', cursor: 'pointer' }}
+          >
+            LEADERBOARD
+          </button>
+          <button
+            onClick={() => setActiveTab('history')}
+            style={{ flex: 1, textAlign: 'center', padding: '9px 0', border: `1px solid ${activeTab === 'history' ? 'var(--accent-gold)' : 'var(--border-subtle)'}`, borderRadius: 9, background: 'var(--bg-card)', fontFamily: "'Bebas Neue', sans-serif", fontSize: 13, letterSpacing: '.16em', color: activeTab === 'history' ? 'var(--accent-gold)' : 'var(--text-secondary)', cursor: 'pointer' }}
+          >
+            MY ROUNDS
+          </button>
+          <button
+            onClick={() => setActiveTab('howto')}
+            style={{ width: 42, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${activeTab === 'howto' ? 'var(--accent-gold)' : 'var(--border-subtle)'}`, borderRadius: 9, background: 'var(--bg-card)', fontFamily: "'Bebas Neue', sans-serif", fontSize: 14, color: activeTab === 'howto' ? 'var(--accent-gold)' : 'var(--text-secondary)', cursor: 'pointer' }}
+          >
+            ?
+          </button>
+        </div>
+
+        {activeTab === 'howto' ? (
+          <HowToPlay />
+        ) : activeTab === 'history' ? (
+          <div className="w-full">
+            {roundHistory.length === 0 ? (
+              <div style={{ padding: 20, textAlign: 'center', fontSize: 11, color: 'var(--text-muted)' }}>
+                No rounds yet. Pick numbers and play.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                {roundHistory.slice(0, 10).map((r, i) => (
+                  <div key={r.timestamp} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '10px 12px', border: '1px solid #1e1e28', borderRadius: 10, background: 'var(--bg-card)' }}>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      <span style={{ fontSize: 11, color: 'var(--text-primary)' }}>{r.hits} / 8 HITS</span>
+                      <span style={{ fontSize: 8.5, letterSpacing: '.08em', color: 'var(--text-muted)' }}>{r.picks.length} picks • {r.wager.toFixed(1)} COOK</span>
+                    </div>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: r.payout > 0 ? '#22c55e' : '#ef4444' }}>
+                      {r.payout > 0 ? '+' : ''}{r.payout.toFixed(2)} COOK
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <Leaderboard />
+        )}
+
+        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
           <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 12, letterSpacing: '.28em', color: 'var(--accent-gold-dim)' }}>PICK 1-10 • 8 DRAWN</span>
           <span style={{ fontSize: 8, letterSpacing: '.1em', color: 'var(--text-muted)' }}>TREASURY 5Nhc…iDf29</span>
         </div>
