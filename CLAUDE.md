@@ -1,231 +1,201 @@
-# CLAUDE.md — Click The Cookie
+# CLAUDE.md — Cookie Keno handoff
 
-> Project memory for Claude Code (or any AI coding agent) working on this repo. Read this first.
+> Project memory + autonomous build guide for the next agent (Claude Code or any other).
+> Read this file top to bottom before doing anything. Then read THESIS.md.
+
+---
 
 ## What this project is
 
-**Click The Cookie** — a Cookie Clicker game, fully on-chain, deployed to Cookie Chain.
+**Cookie Keno** — a real-money keno game on Cookie Chain. Pick 1–10 numbers from 1–40, wager COOK, get paid in COOK. Provably-fair randomness from the recent blockhash. Live on-chain. Live leaderboard.
 
-- The chain is named after the cookie metaphor. We're leaning all the way in.
-- The full thesis, architecture, and build plan are in [THESIS.md](./THESIS.md). **Read that first if you haven't.**
+The previous agent (Mavis session `mvs_b2deecb8081c4af9b63ea866a309bd92`, user `K Slim`) attempted a Cookie Clicker first; that concept was abandoned because a faithful clone requires 2–3 weeks and a stripped-down version is a hollow counter. This handoff pivots to keno, which can be completed in 6–8 hours of focused autonomous work and ships as a real product.
 
-## Status
+The full pitch, payout table, and architecture live in [THESIS.md](./THESIS.md). **Read that file first.**
 
-- [x] Thesis greenlit
-- [x] Folder created on Desktop (`C:\Users\AbuBa\Desktop\cookie-clicker\`)
-- [x] THESIS.md and CLAUDE.md written
-- [x] Repo initialized (git init) and first commit (2bec2ba)
-- [x] Next.js 16 + React 19 app scaffolded in `app/`
-- [x] Solana wallet stack installed (`@solana/web3.js`, wallet-adapter-react, spl-token, spl-memo, lucide-react)
-- [x] Custom Nightly wallet adapter (no first-party adapter exists; wraps `window.nightly.solana`)
-- [x] Clicker transaction builder (SystemProgram.transfer + Memo program)
-- [x] Wallet connect UI, cookie SVG, stats grid, upgrade shop (8 buildings)
-- [x] Dev server running on http://localhost:3000 — page returns 200
-- [x] **Treasury keypair generated** (pubkey `5Nhcsv4ip2dF5fyN6of3NR98pv3wq75tWdPgqi9iDf29`, secret in `app/scripts/treasury.json` gitignored)
-- [x] **Clicker logic simplified** — uniform burn per click; golden cookie is off-chain visual + counter boost (no double-burn)
-- [x] README with full bridge instructions
-- [ ] User bridges ~$1-2 of COOK from Solana → treasury + personal Nightly wallet
-- [ ] First real on-chain click on Cookie Chain mainnet
-- [ ] Real-time leaderboard via cookiescan API
-- [ ] .cook name multiplier read
-- [ ] Vercel deploy
-- [ ] X thread posted
-- [ ] Telegram share
+---
+
+## What's already done (do not redo)
+
+- ✅ Next.js 16 + React 19 + Tailwind 4 scaffolded at `app/`
+- ✅ Solana wallet stack installed (`@solana/web3.js`, `@solana/wallet-adapter-react`, `@solana/wallet-adapter-react-ui`, `@solana/wallet-adapter-base`, `@solana/wallet-adapter-wallets`, `@solana/spl-memo`, `@solana/spl-token`, `clsx`, `lucide-react`)
+- ✅ Custom `NightlyWalletAdapter` at `app/lib/nightly-adapter.ts` (wraps `window.nightly.solana`, polls for publicKey)
+- ✅ Treasury keypair generated: pubkey `5Nhcsv4ip2dF5fyN6of3NR98pv3wq75tWdPgqi9iDf29`
+- ✅ Treasury secret in `app/scripts/treasury.json` (gitignored, user has backed it up)
+- ✅ Treasury funded with >1 COOK on Cookie Chain (rent-exempt)
+- ✅ Wallet connection UI works with Nightly (after the placeholder-poll fix)
+- ✅ 6 commits in local git (`2bec2ba` initial → `5aea911` last)
+- ✅ Dev server starts on http://localhost:3000
+
+The clicker-specific UI (Cookie SVG, click handler, upgrades, golden cookie) is **stale and should be deleted** as part of Stage 0.
+
+---
+
+## What's NOT done (the work)
+
+The 8 build stages in [THESIS.md § Build stages](./THESIS.md#build-stages-the-order-with-explicit-completion-gates). Each stage has explicit pass/fail criteria. The verification loop is below.
+
+**You (the next agent) are expected to:**
+1. Work through Stages 0 → 7 in order
+2. After each stage, run `node app/scripts/verify.mjs N` where N is the stage number
+3. If the verify script reports failures, fix the code and re-run until pass
+4. Do not advance to Stage N+1 until Stage N passes
+5. After all 8 stages pass, write a handoff summary to `HANDOFF.md` (completion log)
+6. The dev server should be running on http://localhost:3000 with the finished game
+
+---
+
+## Critical gotchas (the previous agent's mistakes — do not repeat)
+
+1. **Phantom wallet doesn't support custom RPCs.** Don't tell the user to add Cookie Chain as a custom RPC in Phantom — it doesn't exist there. Use Nightly (with imported seed from Phantom) or Backpack. Phantom shows Phantom's own supported chains only.
+2. **Nightly's `publicKey` is the SystemProgram placeholder (`1111...1111`) until you call `connect()` and a successful key is published.** Don't trust it from polling. Wait for it to become non-placeholder after the `connect()` promise resolves. The polling-with-timeout approach in `app/app/page.tsx` already handles this; reuse the pattern, don't reinvent.
+3. **Nightly doesn't expose `signAndSendTransaction`.** Use `n.signTransaction(tx)` then `connection.sendRawTransaction(signed.serialize())`. The previous agent tried `signAndSendTransaction` and got "is not a function" on every click.
+4. **Transfers to unfunded accounts need ≥890,000 lamports for rent-exempt.** The treasury is already funded (>1 COOK), so this is handled. Don't re-derive a fresh treasury or you'll need to re-fund it.
+5. **The treasury secret key is in `app/scripts/treasury.json`, which is gitignored.** Treat it as load-bearing for the demo. If you ever need to send a payout tx from the treasury, you'll load this file in the browser. This is acceptable for a hackathon; for real money, move the key to a Vercel serverless function.
+6. **Don't promise features in the THESIS that aren't built.** Build the meat alongside the UI, not after. The previous agent promised cNFTs, leaderboards, airdrops in the clicker and shipped only the cookie. Don't repeat that.
+7. **Set a real `recentBlockhash` before signing.** Empty `recentBlockhash = ''` will be rejected. Always call `connection.getLatestBlockhash('confirmed')` first.
+
+---
+
+## Verification loop
+
+After completing each stage, run:
+
+```bash
+node app/scripts/verify.mjs N
+```
+
+Where N is the stage number. The script:
+- Runs the stage's specific checks
+- Prints `PASS` or `FAIL` per check
+- Exits 0 if all pass, 1 if any fail
+- Writes a stage report to `app/scripts/reports/stage-N.json`
+
+If any check fails, fix the code, re-run, repeat until all pass. **Do not advance to the next stage with failing checks.**
+
+If the user (or another agent) wants to verify the whole project at once:
+
+```bash
+node app/scripts/verify.mjs all
+```
+
+This runs all 8 stage checks in order. Exits 0 only if all pass.
+
+---
 
 ## Dev commands
 
-```bash
+```powershell
+# from C:\Users\AbuBa\Desktop\cookie-clicker\app
 cd "C:\Users\AbuBa\Desktop\cookie-clicker\app"
-.\node_modules\.bin\next.cmd dev --webpack -p 3000
+npm install --legacy-peer-deps   # only if node_modules missing
+node_modules\.bin\next.cmd dev --webpack -p 3000
 ```
 
-Open http://localhost:3000 to test. Install Nightly from https://nightly.app and use the in-app Connect button.
+Open http://localhost:3000 to test.
 
-## Treasury (locked in)
+The dev server uses Webpack (not Turbopack) because Turbopack requires native bindings that fail on this Windows box. Always pass `--webpack`.
 
-- **Public key**: `5Nhcsv4ip2dF5fyN6of3NR98pv3wq75tWdPgqi9iDf29`
-- **Private key**: `app/scripts/treasury.json` (gitignored) — user must back this up
-- **Funding path**: bridge SPL COOK from Solana via https://bridge.cookiescan.io to this address
+---
 
-## Key TODOs in code
-
-- After deploy, optionally add the **starter-pack sponsor** feature (treasury → new user airdrop, requires backend/Vercel function)
-- After deploy, optionally add the **real golden cookie airdrop** (treasury signs separate tx to user on golden hit, requires backend)
-
-## Architectural decision: Path A (Lean)
-
-We chose **no custom Anchor program** — every click is a SystemProgram.transfer (burning COOK) + Memo program write. PDAs and on-chain state are derived off-chain from the tx history. Saves us the Rust toolchain install (Rust/Cargo/Anchor are NOT on this machine) and ships faster. If the judges want a real program address, we can add it on Day 2-3.
-
-## Tech stack (locked — don't substitute)
-
-- **Chain**: Cookie Chain (SVM, Solana-compatible)
-- **RPC**: `https://rpc.cookiescan.io`
-- **Wallet**: Nightly (required by the brief; the only wallet on Cookie Chain)
-- **Program framework**: Anchor (latest stable for Solana)
-- **Frontend**: Next.js 14 (App Router), TypeScript, Tailwind
-- **Wallet adapter**: `@solana/wallet-adapter-react` + `@solana/wallet-adapter-nightly` (verify package name)
-- **On-chain programs (genesis-embedded on Cookie Chain)**:
-  - SPL Token: `TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA`
-  - Token-2022: `TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb`
-  - Metaplex: `metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s`
-  - Bubblegum (cNFTs): `BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY`
-  - Name Service (.cook): `namesLPneVptA9Z5rqUDD9tMTWEJwofgaYwp8cawRkX`
-  - Jupiter v6: `JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4`
-- **Hosting**: Vercel (frontend)
-- **Repo**: GitHub public
-- **License**: MIT
-
-## File structure (target)
+## File map (current state — before you start)
 
 ```
 cookie-clicker/
-├── programs/clicker/          # Anchor program (Rust)
-│   ├── src/
-│   │   ├── lib.rs
-│   │   ├── state.rs
-│   │   ├── instructions/
-│   │   │   ├── mod.rs
-│   │   │   ├── click.rs
-│   │   │   ├── buy_upgrade.rs
-│   │   │   └── claim_golden.rs
-│   │   └── errors.rs
-│   ├── Cargo.toml
-│   └── Anchor.toml
-├── app/                       # Next.js frontend
+├── THESIS.md                                    ← READ FIRST
+├── CLAUDE.md                                    ← this file
+├── .gitignore
+├── app/
 │   ├── app/
-│   │   ├── page.tsx           # main clicker page
-│   │   ├── leaderboard/page.tsx
-│   │   ├── analytics/page.tsx
-│   │   └── layout.tsx
+│   │   ├── page.tsx                             ← STALE (clicker). Delete in Stage 0.
+│   │   ├── layout.tsx                            ← Keep
+│   │   └── globals.css                           ← Keep, restyle for keno
 │   ├── components/
-│   │   ├── Cookie.tsx
-│   │   ├── UpgradeShop.tsx
-│   │   ├── GoldenCookie.tsx
-│   │   ├── Leaderboard.tsx
-│   │   ├── Dashboard.tsx
-│   │   └── WalletButton.tsx
+│   │   ├── WalletContextProvider.tsx             ← Keep
+│   │   ├── WalletButton.tsx                      ← Keep
+│   │   ├── Cookie.tsx                            ← STALE. Delete.
+│   │   ├── Stats.tsx                             ← STALE. Repurpose or delete.
+│   │   └── UpgradeShop.tsx                       ← STALE. Delete.
 │   ├── lib/
-│   │   ├── anchor.ts          # Anchor client setup
-│   │   ├── cookiechain.ts     # RPC + connection
-│   │   ├── cook-mcp.ts        # cookie-mcp client (if useful)
-│   │   └── cookiescan.ts      # cookiescan API
-│   └── public/
-├── scripts/                   # Deploy + init + indexer
-│   ├── init-treasury.ts
-│   └── index-leaderboard.ts
-├── THESIS.md                  # full spec (read first)
-├── CLAUDE.md                  # this file
-├── AGENTS.md                  # Mavis / multi-tool project memory
-└── README.md                  # public setup instructions
+│   │   ├── cookiechain.ts                        ← UPDATE: rename TREASURY_PUBKEY, add bankroll config, payout constants
+│   │   ├── clicker.ts                            ← DELETE (was clicker-specific)
+│   │   ├── keno.ts                               ← NEW: game logic, draw derivation, payout calc
+│   │   ├── nightly-adapter.ts                    ← Keep (already works)
+│   │   └── leaderboard.ts                        ← NEW: cookiescan reader
+│   ├── scripts/
+│   │   ├── generate-treasury.mjs                 ← Keep (already ran)
+│   │   ├── treasury.json                         ← Keep, gitignored
+│   │   └── verify.mjs                            ← NEW: stage verification
+│   └── package.json                              ← Already correct
+└── README.md                                     ← UPDATE in Stage 7
 ```
 
-## Build order (locked)
+---
 
-1. **Anchor program first** (the hard part):
-   - `click` instruction (burn COOK, increment counter, mint crumb cNFT)
-   - `buy_upgrade` instruction (spend crumbs, increment upgrade state)
-   - `claim_golden` instruction (verify pseudo-random, airdrop COOK from treasury)
-   - PDAs: player state, upgrades, golden cookie treasury
-2. **Frontend second**:
-   - Next.js + wallet adapter + Nightly
-   - Click handler with tx toasts
-   - Upgrade shop
-   - Golden cookie popup
-   - Leaderboard + analytics dashboard
-3. **Deploy**:
-   - Anchor: Cookie Chain mainnet
-   - Frontend: Vercel
-4. **Submit**:
-   - GitHub public repo
-   - Vercel URL
-   - X thread (5-7 tweets)
-   - Telegram share in `t.me/TheCookieNetChain`
+## Build order (the full plan)
 
-## Key constraints
+For full details, payout table, and architecture, see [THESIS.md](./THESIS.md). The short version:
 
-- **Every click = a real tx.** Sub-cent fees make this viable. Don't batch clicks client-side.
-- **Sub-second finality** means clicks feel snappy. Don't add artificial latency.
-- **COOK is the burn + earn token.** Need to find the COOK mint address on Cookie Chain (look on cookiescan.io or check the bridge page).
-- **Nightly wallet is required** (the only wallet that works on Cookie Chain currently).
-- **Programs deploy for ~$0.05.** Iterate cheaply.
-- **Open source, MIT license, GitHub public.**
+1. **Stage 0 — Set up** (30 min): verify dev server runs, delete stale clicker files, create `verify.mjs` skeleton
+2. **Stage 1 — Keno board UI** (2 h): 1–40 number grid, picking, wager input, no tx yet
+3. **Stage 2 — Real wager tx** (1 h): SystemProgram.transfer + Memo on click
+4. **Stage 3 — Draw + payout** (2 h): derive 8 numbers from blockhash, send payout tx from treasury
+5. **Stage 4 — Provably-fair verify display** (30 min): show the blockhash and derivation
+6. **Stage 5 — Leaderboard** (2 h): read cookiescan tx history, show top 10
+7. **Stage 6 — .cook name multiplier** (1 h): read Name Service, +50% if holding
+8. **Stage 7 — Polish + ship** (1 h): README, Vercel, X thread, Telegram
 
-## Decisions made (don't re-litigate unless I tell you to)
+Each stage has explicit pass/fail criteria. Run `node app/scripts/verify.mjs N` after each.
 
-- ✅ Game design: **Cookie Clicker** (not keno, crash, copy-trader, launchpad)
-- ✅ Each click **burns COOK** (drives chain value)
-- ✅ Each click **mints a crumb cNFT** (Bubblegum)
-- ✅ Each upgrade **is a PDA**
-- ✅ Golden Cookie = **lottery** (provably-fair, on-chain)
-- ✅ .cook name = **click multiplier**
-- ✅ Frontend: **Next.js** (not Vite/CRA)
-- ✅ Wallet: **Solana wallet adapter + Nightly**
-- ✅ No AI/LLM (deterministic logic only)
-- ✅ No mobile native (web responsive only)
+---
 
-## Open questions to resolve (Day 1)
+## How to spawn a verifier via Mavis CLI
 
-- [ ] COOK token mint address on Cookie Chain (search cookiescan.io or token list)
-- [ ] .cook name service: account layout (PDA derivation pattern)
-- [ ] Bubblegum merkle tree config
-- [ ] Anchor version that works with Cookie Chain (likely 0.30+)
-- [ ] Cookie Chain devnet availability (use mainnet if no devnet)
-- [ ] cookiescan.io API endpoints (check for a `/api/...` route)
-- [ ] cookie-mcp endpoints and capabilities (if it exists as a public MCP server)
-- [ ] Nightly wallet adapter package name on npm
-
-## Commands to remember
+If the next agent is also Mavis (or has access to the `mavis` CLI), it can spawn a fresh child agent as a verifier at the end of any stage:
 
 ```bash
-# Anchor (after installing: cargo install --git https://github.com/coral-xyz/anchor anchor-cli --locked)
-anchor --version
-anchor init programs/clicker --no-git
-anchor build
-anchor deploy --provider.cluster https://rpc.cookiescan.io
-anchor test
-
-# Frontend
-cd app
-npx create-next-app@14 . --typescript --tailwind --app
-npm install
-npm run dev
-npm run build
-
-# Wallet: Nightly (download from nightly.app; the cookie chain docs recommend it as the first supported wallet)
-
-# Solana CLI
-solana config set --url https://rpc.cookiescan.io
-solana balance
-solana airdrop 0.1  # may not work on Cookie Chain — check
+mavis task --agent verifier --prompt "Run app/scripts/verify.mjs all and report pass/fail"
 ```
 
-## Style guide
+The verifier has read-only access to the repo and runs the verification script. The orchestrator (this agent) reads the report and decides whether to advance.
 
-- **Anchor program**: use the latest Anchor conventions (declare_id, Account<'info, T>, Context, etc.). Add `#[account]` macros. Use Anchor's `init` for PDAs.
-- **TypeScript**: strict mode, no `any`, prefer `as const` for literals, use `zod` for runtime validation if needed.
-- **React**: functional components, hooks, no class components. Use `useMemo`/`useCallback` for expensive ops.
-- **Tailwind**: utility classes only, no custom CSS files unless absolutely needed. Theme: dark mode, cookie/blue accent matching Cookie Chain docs.
-- **Comments**: minimal. Code should be self-explanatory. Comment only "why", not "what".
-- **No emojis in code** (only in user-facing UI strings).
+If `mavis` CLI is not available, the next agent self-verifies by running `verify.mjs` itself and reading the output.
 
-## Communication style with the user
+---
 
-The user (K Slim) is direct, asks sharp questions, and pushes back when something doesn't make sense. Don't oversell. Don't pad. Lead with the answer, then evidence. If a tradeoff is real, name it.
+## Communication style with the user (K Slim)
+
+The user is direct, sharp, pushes back when something doesn't add up, and has been frustrated by previous agent mistakes. Lead with the answer, not the apology. Don't pad. Don't over-promise. Show your work.
 
 User profile (from memory):
 - Building an automated trading portfolio as a personal hobby, eventual financial gain
 - Cares about practical edge / live-readiness over research novelty
-- Cares about not making silly mistakes (e.g. percent units in backtest output)
-- Wants fast, clear execution; will ask follow-ups if confused
+- Cares about percent units in numeric output (use % not whole numbers)
+- Wants fast, clear execution; will push back if confused
 
-## The X thread is the deliverable
+When you finish a stage and verify it passes, give a one-paragraph status. When you hit a problem, give the error and your fix in the same message. Don't ask permission to debug — just do it and report.
 
-Beyond the app, the X thread is what wins the submission. Keep it tight, build a visual, ship a demo video. The 5-7 tweet draft is in THESIS.md.
+---
 
-## When in doubt
+## When you're done
 
-- Read THESIS.md.
-- Read the Cookie Chain docs: https://docs.cookiechain.wtf
-- Read the developer guide specifically: https://docs.cookiechain.wtf/developer-guide
-- Check cookiescan.io for live program addresses.
-- Ask the user.
+After all 8 stages pass `verify.mjs all`:
+
+1. Write `HANDOFF.md` with:
+   - Date completed
+   - Git commit hash
+   - Live URL (if deployed) or http://localhost:3000 (if not)
+   - Treasury address: `5Nhcsv4ip2dF5fyN6of3NR98pv3wq75tWdPgqi9iDf29`
+   - Number of test rounds played end-to-end
+   - Any deviations from the plan
+   - Known limitations
+
+2. Commit everything: `git add -A && git commit -m "Cookie Keno v1: stages 0-7 complete"`
+
+3. Hand back to the user with the HANDOFF.md contents and the public URL.
+
+---
+
+## License
+
+MIT.
