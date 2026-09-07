@@ -47,7 +47,7 @@ export function ResultPopup({ hits, payout, wager, active, onClose }: ResultPopu
             textShadow: isWin ? 'none' : '0 0 20px rgba(255,255,255,0.3)',
           }}
         >
-          {isBigWin ? '⭐ BIG WIN! ⭐' : isWin ? 'YOU WIN!' : 'NO WIN'}
+          {isBigWin ? 'BIG WIN!' : isWin ? 'YOU WIN!' : 'NO WIN'}
         </div>
 
         {/* Hits */}

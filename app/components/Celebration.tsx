@@ -133,11 +133,11 @@ export function Celebration({ active, type }: CelebrationProps) {
           }}
         >
           <div className={`${isJackpot ? 'text-7xl md:text-9xl lg:text-[10rem]' : 'text-5xl md:text-7xl'} font-bold`}>
-            {isJackpot ? '🎰 JACKPOT! 🎰' : '🎉 YOU WIN! 🎉'}
+            {isJackpot ? 'JACKPOT!' : 'YOU WIN!'}
           </div>
           {isJackpot && (
             <div className="text-3xl md:text-5xl mt-2 animate-pulse">
-              ★ SUPER WIN ★
+              SUPER WIN
             </div>
           )}
         </div>

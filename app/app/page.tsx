@@ -243,7 +243,7 @@ export default function Home() {
       setRoundHistory((prev) => [result, ...prev].slice(0, 10));
 
       if (payout > 0) {
-        const jackpotMsg = jackpotWin ? ` 🎰 JACKPOT +${jackpotAmount.toFixed(2)}!` : '';
+        const jackpotMsg = jackpotWin ? ` JACKPOT +${jackpotAmount.toFixed(2)}!` : '';
         setToast({ kind: 'win', msg: `Won ${payout.toFixed(2)} COOK!${jackpotMsg} (demo)`, sig: signature });
         // Trigger celebration
         setCelebrationType(jackpotWin ? 'jackpot' : 'win');
