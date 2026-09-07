@@ -107,7 +107,29 @@ export default function Home() {
     };
   }, []);
 
+  // Check for existing wallet connection on mount
+  useEffect(() => {
+    const n = getNightly();
+    if (n?.publicKey && !isPlaceholder(n.publicKey)) {
+      setNightlyPk(n.publicKey);
+      fetchBalance(n.publicKey);
+    }
+  }, []);
+
   const publicKey = nightlyPk;
+
+  const fetchBalance = useCallback(async (pk: PublicKey) => {
+    try {
+      // Get SOL balance first
+      const solBalance = await connection.getBalance(pk, 'confirmed');
+      // Convert from lamports to SOL (assuming 1 SOL = 1 COOK for simplicity, or use token balance)
+      const balanceInTokens = solBalance / 1e9;
+      setBalance(balanceInTokens);
+    } catch (e) {
+      console.error('Failed to fetch balance:', e);
+      setBalance(0);
+    }
+  }, [connection]);
 
   const handleConnect = useCallback(async () => {
     const n = getNightly();
@@ -122,12 +144,14 @@ export default function Home() {
       if (!isPlaceholder(pk)) {
         setToast({ kind: 'ok', msg: `Connected: ${pk.toBase58().slice(0, 6)}…` });
         setTimeout(() => setToast(null), 2500);
+        // Fetch balance after connect
+        fetchBalance(pk);
       }
     } catch (e: any) {
       setToast({ kind: 'err', msg: e?.message ?? 'Connect failed' });
       setTimeout(() => setToast(null), 5000);
     }
-  }, []);
+  }, [fetchBalance]);
 
   const handleDisconnect = useCallback(async () => {
     const n = getNightly();
@@ -140,10 +164,16 @@ export default function Home() {
     setBalance(0);
   }, []);
 
-  const canPlay = nightlyReady && publicKey && selectedNumbers.length >= MIN_PICKS && wager >= MIN_WAGER && !pending;
+  const canPlay = nightlyReady && publicKey && selectedNumbers.length >= MIN_PICKS && wager >= MIN_WAGER && !pending && balance >= wager;
 
   const handlePlay = useCallback(async () => {
-    if (!canPlay) return;
+    if (!canPlay) {
+      if (balance < wager && wager > 0) {
+        setToast({ kind: 'err', msg: `Insufficient balance. Need ${wager.toFixed(2)} COOK, have ${balance.toFixed(2)}` });
+        setTimeout(() => setToast(null), 4000);
+      }
+      return;
+    }
 
     const n = getNightly();
     if (!n) {
