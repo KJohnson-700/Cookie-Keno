@@ -25,9 +25,9 @@ export function WagerPanel({ wager, onWagerChange, onPlay, disabled, pending }: 
   const presetAmounts = [0.1, 0.5, 1, 5];
 
   return (
-    <div className="bg-slate-900/60 border border-slate-700/60 rounded-xl p-4 space-y-4">
+    <div className="card p-4 space-y-4">
       <div>
-        <label className="block text-xs uppercase tracking-wider text-slate-500 mb-2">
+        <label className="block text-xs uppercase tracking-widest mb-2" style={{ color: 'var(--text-secondary)' }}>
           Wager (COOK)
         </label>
         <div className="flex gap-2">
@@ -38,14 +38,16 @@ export function WagerPanel({ wager, onWagerChange, onPlay, disabled, pending }: 
             max={MAX_WAGER}
             value={wager}
             onChange={handleInputChange}
-            className="flex-1 bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white font-mono text-lg focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+            className="flex-1 px-4 py-3 rounded text-lg"
+            style={{ background: '#0a0a0f', border: '1px solid var(--border-subtle)' }}
           />
           <div className="flex gap-1">
             {presetAmounts.map((amt) => (
               <button
                 key={amt}
                 onClick={() => onWagerChange(amt)}
-                className="px-3 py-2 text-xs bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 transition-colors"
+                className="px-3 py-2 text-xs rounded transition-colors"
+                style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}
               >
                 {amt}
               </button>
@@ -57,15 +59,9 @@ export function WagerPanel({ wager, onWagerChange, onPlay, disabled, pending }: 
       <button
         onClick={onPlay}
         disabled={disabled || pending}
-        className={`
-          w-full py-3 rounded-lg font-semibold text-lg transition-all duration-200
-          ${disabled || pending
-            ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
-            : 'bg-amber-500 hover:bg-amber-400 text-slate-900 shadow-lg shadow-amber-500/20 hover:shadow-amber-500/40'
-          }
-        `}
+        className="btn-primary w-full py-3 rounded"
       >
-        {pending ? 'Playing...' : 'Play Round'}
+        {pending ? 'PLAYING...' : 'PLAY ROUND'}
       </button>
     </div>
   );

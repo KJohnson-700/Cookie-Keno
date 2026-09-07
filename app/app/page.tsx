@@ -305,14 +305,14 @@ export default function Home() {
 
   return (
     <main className="min-h-screen flex flex-col text-slate-100">
-      <header className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-slate-800/40 backdrop-blur-md bg-slate-900/40">
+      <header className="header flex items-center justify-between px-4 sm:px-6 py-4">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-amber-500/20 grid place-items-center text-amber-300 text-lg">
             🎰
           </div>
           <div>
-            <div className="font-semibold tracking-tight text-lg">Cookie Keno</div>
-            <div className="text-[10px] text-slate-500 font-mono">ON CHAIN • PROVABLY FAIR</div>
+            <h1 className="text-xl tracking-widest gold-text">COOKIE KENO</h1>
+            <div className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>ON CHAIN • PROVABLY FAIR</div>
             <div className="text-[11px] text-slate-500 -mt-0.5">
               on{' '}
               <a className="text-amber-300 hover:underline" href="https://www.cookiechain.wtf" target="_blank" rel="noreferrer">
@@ -427,7 +427,7 @@ export default function Home() {
         <Leaderboard />
       </section>
 
-      <footer className="text-center text-[11px] text-slate-500 py-4 border-t border-slate-800/40 bg-slate-900/20">
+      <footer className="footer text-center text-[11px] py-4">
         <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4">
           <span>🎰 Pick 1-10 • 8 drawn • Win based on hits</span>
           <span className="hidden sm:inline text-slate-700">•</span>

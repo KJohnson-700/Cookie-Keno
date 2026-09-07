@@ -14,50 +14,46 @@ export function ResultsPanel({ picks, draw, hits, payout, wager, signature, bloc
   const profit = payout - wager;
 
   return (
-    <div className="bg-slate-900/80 border border-slate-700/60 rounded-xl p-4 space-y-4">
+    <div className="card p-4 space-y-4 animate-fade-in">
       <div className="text-center">
-        <div className="text-sm text-slate-500 uppercase tracking-wider mb-1">Results</div>
-        <div className="text-3xl font-bold text-white">
-          {hits} / {draw.length} <span className="text-slate-500 text-lg">hits</span>
+        <div className="text-xs uppercase tracking-widest mb-1" style={{ color: 'var(--text-secondary)' }}>Results</div>
+        <div className="text-4xl font-bold gold-text">
+          {hits} <span style={{ color: 'var(--text-secondary)' }}>/ {draw.length}</span>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 text-center">
-        <div className="bg-slate-800/60 rounded-lg p-3">
-          <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Wager</div>
-          <div className="text-lg font-mono text-slate-300">{wager.toFixed(2)} COOK</div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="p-3 text-center" style={{ background: 'var(--bg-card)' }}>
+          <div className="text-xs uppercase tracking-widest mb-1" style={{ color: 'var(--text-secondary)' }}>Wager</div>
+          <div className="text-lg font-mono">{wager.toFixed(2)} COOK</div>
         </div>
-        <div className="bg-slate-800/60 rounded-lg p-3">
-          <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Payout</div>
-          <div className={`text-lg font-mono ${payout > 0 ? 'text-green-400' : 'text-red-400'}`}>
+        <div className="p-3 text-center" style={{ background: 'var(--bg-card)' }}>
+          <div className="text-xs uppercase tracking-widest mb-1" style={{ color: 'var(--text-secondary)' }}>Payout</div>
+          <div className="text-lg font-mono" style={{ color: payout > 0 ? '#22c55e' : '#ef4444' }}>
             {payout.toFixed(2)} COOK
           </div>
         </div>
       </div>
 
       {payout > 0 && (
-        <div className="text-center bg-green-500/10 border border-green-500/30 rounded-lg py-2">
-          <div className="text-sm text-green-400">+{profit.toFixed(2)} COOK profit</div>
+        <div className="text-center p-2" style={{ background: 'rgba(34, 197, 94, 0.1)', border: '1px solid rgba(34, 197, 94, 0.3)' }}>
+          <div style={{ color: '#22c55e' }}>+{profit.toFixed(2)} COOK profit</div>
         </div>
       )}
 
-      {/* Provably Fair Section */}
       {blockhash && (
-        <div className="border-t border-slate-700/60 pt-4 space-y-2">
-          <div className="text-xs text-slate-500 uppercase tracking-wider">Provably Fair</div>
-          <div className="text-xs font-mono text-slate-400 break-all bg-slate-800/60 rounded p-2">
-            Blockhash: {blockhash.slice(0, 20)}...{blockhash.slice(-10)}
-          </div>
-          <div className="text-[10px] text-slate-500">
-            Draw derived from blockhash bytes → mod 40 → 8 unique numbers
+        <div className="border-t pt-4 space-y-2" style={{ borderColor: 'var(--border-subtle)' }}>
+          <div className="text-xs uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>Provably Fair</div>
+          <div className="text-xs font-mono break-all p-2" style={{ background: '#0a0a0f' }}>
+            {blockhash.slice(0, 20)}...{blockhash.slice(-10)}
           </div>
           <a
             href={`https://cookiescan.io/block/${blockhash}`}
             target="_blank"
             rel="noreferrer"
-            className="block text-center text-xs text-amber-500 hover:text-amber-400"
+            className="block text-center text-xs gold-text"
           >
-            View block on CookieScan ↗
+            VIEW ON COOKIESCAN ↗
           </a>
         </div>
       )}
@@ -67,7 +63,7 @@ export function ResultsPanel({ picks, draw, hits, payout, wager, signature, bloc
           href={`https://cookiescan.io/tx/${signature}`}
           target="_blank"
           rel="noreferrer"
-          className="block text-center text-xs text-amber-400 hover:text-amber-300 truncate"
+          className="block text-center text-xs gold-text truncate"
         >
           {signature.slice(0, 12)}…{signature.slice(-6)} ↗
         </a>

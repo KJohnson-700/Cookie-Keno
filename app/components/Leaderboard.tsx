@@ -17,41 +17,56 @@ export function Leaderboard() {
 
   useEffect(() => {
     load();
-    const interval = setInterval(load, 30000); // Refresh every 30s
+    const interval = setInterval(load, 30000);
     return () => clearInterval(interval);
   }, []);
 
+  const getRankColor = (i: number) => {
+    if (i === 0) return '#d4a853';
+    if (i === 1) return '#a8a8a8';
+    if (i === 2) return '#cd7f32';
+    return 'var(--text-secondary)';
+  };
+
   return (
-    <div className="bg-slate-900/80 border border-slate-700/60 rounded-xl p-4 space-y-4">
+    <div className="card p-4 space-y-4">
       <div className="flex items-center justify-between">
-        <div className="text-sm text-slate-400 uppercase tracking-wider">Leaderboard</div>
+        <div className="text-sm uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>Leaderboard</div>
         <button
           onClick={load}
           disabled={loading}
-          className="p-2 rounded-lg hover:bg-slate-800 transition-colors disabled:opacity-50"
+          className="p-2 rounded transition-colors"
+          style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)' }}
         >
-          <RefreshCw className={`w-4 h-4 text-slate-500 ${loading ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} style={{ color: 'var(--text-secondary)' }} />
         </button>
       </div>
 
       {entries.length === 0 ? (
-        <div className="text-center text-slate-500 text-sm py-4">
+        <div className="text-center py-4" style={{ color: 'var(--text-muted)' }}>
           No games yet. Be the first to play!
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-1">
           {entries.map((entry, i) => (
-            <div key={entry.signature} className="flex items-center justify-between bg-slate-800/40 rounded-lg px-3 py-2">
+            <div
+              key={entry.signature}
+              className="flex items-center justify-between p-2 rounded"
+              style={{ background: 'var(--bg-card)' }}
+            >
               <div className="flex items-center gap-3">
-                <span className={`text-lg font-bold ${i === 0 ? 'text-yellow-400' : i === 1 ? 'text-slate-300' : i === 2 ? 'text-amber-600' : 'text-slate-500'}`}>
+                <span className="text-lg font-bold font-mono" style={{ color: getRankColor(i) }}>
                   #{i + 1}
                 </span>
                 <div className="text-xs">
-                  <div className="text-slate-400 font-mono">{entry.address}</div>
-                  <div className="text-slate-500">{entry.hits} hits · {entry.picks.length} picks</div>
+                  <div className="font-mono" style={{ color: 'var(--text-primary)' }}>{entry.address}</div>
+                  <div style={{ color: 'var(--text-muted)' }}>{entry.hits} hits · {entry.picks.length} picks</div>
                 </div>
               </div>
-              <div className={`text-sm font-mono font-semibold ${entry.payout > entry.wager ? 'text-green-400' : 'text-red-400'}`}>
+              <div
+                className="text-sm font-mono font-bold"
+                style={{ color: entry.payout > entry.wager ? '#22c55e' : '#ef4444' }}
+              >
                 {entry.payout > 0 ? '+' : ''}{(entry.payout - entry.wager).toFixed(2)} COOK
               </div>
             </div>
