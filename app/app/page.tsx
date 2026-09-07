@@ -2,40 +2,45 @@
 
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { useConnection } from '@solana/wallet-adapter-react';
-import { PublicKey } from '@solana/web3.js';
+import { PublicKey, Transaction, VersionedTransaction } from '@solana/web3.js';
 
 import { WalletButton } from '@/components/WalletButton';
 import { Cookie } from '@/components/Cookie';
 import { Stats } from '@/components/Stats';
 import { UpgradeShop, UPGRADES, costFor } from '@/components/UpgradeShop';
-import {
-  buildClickTransaction,
-  confirmSignature,
-} from '@/lib/clicker';
-import {
-  CLICK_BURN_LAMPORTS,
-  GOLDEN_COOKIE_CHANCE,
-} from '@/lib/cookiechain';
+import { buildClickTransaction, confirmSignature } from '@/lib/clicker';
+import { CLICK_BURN_LAMPORTS, GOLDEN_COOKIE_CHANCE } from '@/lib/cookiechain';
 
 const TREASURY_PK = new PublicKey('5Nhcsv4ip2dF5fyN6of3NR98pv3wq75tWdPgqi9iDf29');
 const STORAGE_KEY = 'click-the-cookie:v1';
 
-// Direct window.nightly access — bypasses the wallet adapter so we don't
-// depend on its connection state machine (which was causing click-blocking
-// when Nightly was loaded but not formally "connected").
+// Direct window.nightly access — bypasses the wallet adapter for reliability.
+// We only trust a publicKey AFTER a successful connect() call, because
+// Nightly exposes a SystemProgram placeholder publicKey when not connected.
 type NightlyProvider = {
   isNightly?: boolean;
   publicKey?: PublicKey | null;
   isConnected?: boolean;
   connect: () => Promise<{ publicKey: PublicKey }>;
   disconnect: () => Promise<void>;
-  signAndSendTransaction: (tx: any, opts?: any) => Promise<{ signature: string }>;
+  signAndSendTransaction?: (tx: any, opts?: any) => Promise<{ signature: string }>;
   signTransaction: (tx: any) => Promise<any>;
 };
+
+const PLACEHOLDER_PK = new PublicKey('11111111111111111111111111111111');
 
 function getNightly(): NightlyProvider | null {
   if (typeof window === 'undefined') return null;
   return (window as any).nightly?.solana ?? null;
+}
+
+function isPlaceholder(pk: PublicKey | null | undefined): boolean {
+  if (!pk) return true;
+  try {
+    return pk.equals(PLACEHOLDER_PK);
+  } catch {
+    return true;
+  }
 }
 
 type SaveState = {
@@ -60,34 +65,22 @@ function defaultState(): SaveState {
 
 export default function Home() {
   const { connection } = useConnection();
-  const [nightlyPk, setNightlyPk] = useState<PublicKey | null>(null);
   const [nightlyReady, setNightlyReady] = useState(false);
+  const [nightlyPk, setNightlyPk] = useState<PublicKey | null>(null);
   const [save, setSave] = useState<SaveState>(defaultState);
   const [pending, setPending] = useState(false);
   const [toast, setToast] = useState<{ kind: 'ok' | 'err' | 'gold'; msg: string; sig?: string } | null>(null);
   const [goldenFlash, setGoldenFlash] = useState(false);
   const lastClickAt = useRef<number>(0);
 
-  // Poll for Nightly provider; update when it appears, when its key changes,
-  // or when the user connects/disconnects from inside Nightly.
+  // Poll for Nightly provider presence only (not the publicKey, since that
+  // can be a placeholder until connect() runs).
   useEffect(() => {
     let cancelled = false;
     const tick = () => {
       if (cancelled) return;
       const n = getNightly();
-      if (n) {
-        setNightlyReady(true);
-        const pk = n.publicKey ?? null;
-        setNightlyPk((prev) => {
-          const a = prev?.toBase58() ?? null;
-          const b = pk?.toBase58() ?? null;
-          if (a === b) return prev;
-          return pk;
-        });
-      } else {
-        setNightlyReady(false);
-        setNightlyPk(null);
-      }
+      setNightlyReady(!!n);
     };
     tick();
     const id = setInterval(tick, 500);
@@ -151,9 +144,36 @@ export default function Home() {
 
   const cps = useMemo(() => computeCps(save.owned), [save.owned]);
 
-  // The cookie is enabled if Nightly is loaded into the browser. The user may
-  // not be formally connected yet — we call connect() lazily on first click.
   const canClick = nightlyReady;
+
+  const handleConnect = useCallback(async () => {
+    const n = getNightly();
+    if (!n) {
+      window.open('https://nightly.app', '_blank', 'noreferrer');
+      return;
+    }
+    try {
+      const r = await n.connect();
+      const pk = r.publicKey;
+      if (isPlaceholder(pk)) {
+        throw new Error('Nightly returned a placeholder public key. Try again.');
+      }
+      setNightlyPk(pk);
+    } catch (e: any) {
+      setToast({ kind: 'err', msg: e?.message ?? 'Connect failed' });
+      setTimeout(() => setToast(null), 3500);
+    }
+  }, []);
+
+  const handleDisconnect = useCallback(async () => {
+    const n = getNightly();
+    if (n) {
+      try {
+        await n.disconnect();
+      } catch {}
+    }
+    setNightlyPk(null);
+  }, []);
 
   const onClick = useCallback(async () => {
     const n = getNightly();
@@ -163,15 +183,18 @@ export default function Home() {
       return;
     }
 
-    // Lazy connect on first click
-    let wallet = n.publicKey ?? null;
-    if (!wallet) {
+    // Lazy connect if not already connected
+    let wallet = publicKey;
+    if (!wallet || isPlaceholder(wallet)) {
       try {
         const r = await n.connect();
         wallet = r.publicKey;
+        if (isPlaceholder(wallet)) {
+          throw new Error('Connect failed: placeholder public key');
+        }
         setNightlyPk(wallet);
       } catch (e: any) {
-        setToast({ kind: 'err', msg: 'Connect cancelled' });
+        setToast({ kind: 'err', msg: e?.message ?? 'Connect cancelled' });
         setTimeout(() => setToast(null), 3500);
         return;
       }
@@ -189,7 +212,9 @@ export default function Home() {
 
     const isGolden = Math.random() < GOLDEN_COOKIE_CHANCE;
     const clickNumber = save.txCount + 1;
+
     try {
+      // Build the tx
       const tx = buildClickTransaction({
         wallet,
         treasury: TREASURY_PK,
@@ -197,11 +222,22 @@ export default function Home() {
         burnLamports: CLICK_BURN_LAMPORTS,
         isGolden,
       });
-      const { signature } = await n.signAndSendTransaction(tx, {
-        // Pre-flight simulation so we don't waste a tx on a guaranteed failure
-        // signers: [],
+
+      // Set a real recent blockhash from the Cookie Chain RPC
+      const { blockhash } = await connection.getLatestBlockhash('confirmed');
+      tx.recentBlockhash = blockhash;
+
+      // Sign with Nightly (works on every Solana-like wallet)
+      const signed = await n.signTransaction(tx);
+
+      // Submit via the connection (uses our Cookie Chain RPC)
+      const raw = signed.serialize();
+      const signature = await connection.sendRawTransaction(raw, {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
       });
 
+      // Optimistic UI update
       setSave((s) => ({
         ...s,
         cookies: s.cookies + perClick + (isGolden ? 100 : 0),
@@ -220,15 +256,16 @@ export default function Home() {
       }
       setTimeout(() => setToast(null), 3500);
 
+      // Background confirmation
       confirmSignature(signature).catch(() => {});
     } catch (err: any) {
-      const msg = String(err?.message ?? err ?? 'Click failed');
-      setToast({ kind: 'err', msg: msg.length > 120 ? msg.slice(0, 117) + '…' : msg });
-      setTimeout(() => setToast(null), 3500);
+      const raw = String(err?.message ?? err ?? 'Click failed');
+      setToast({ kind: 'err', msg: raw.length > 160 ? raw.slice(0, 157) + '…' : raw });
+      setTimeout(() => setToast(null), 5000);
     } finally {
       setPending(false);
     }
-  }, [pending, save.txCount, perClick]);
+  }, [pending, save.txCount, perClick, publicKey, connection]);
 
   const onBuy = useCallback(
     (id: string) => {
@@ -256,22 +293,19 @@ export default function Home() {
           <div>
             <div className="font-semibold tracking-tight">Click The Cookie</div>
             <div className="text-[11px] text-slate-500 -mt-0.5">
-              on <a className="text-amber-300 hover:underline" href="https://www.cookiechain.wtf" target="_blank" rel="noreferrer">Cookie Chain</a>
+              on{' '}
+              <a className="text-amber-300 hover:underline" href="https://www.cookiechain.wtf" target="_blank" rel="noreferrer">
+                Cookie Chain
+              </a>
             </div>
           </div>
         </div>
-        <WalletButton publicKey={publicKey} nightlyReady={nightlyReady} onConnect={async () => {
-          const n = getNightly();
-          if (!n) return;
-          try {
-            const r = await n.connect();
-            setNightlyPk(r.publicKey);
-          } catch {}
-        }} onDisconnect={async () => {
-          const n = getNightly();
-          if (n) try { await n.disconnect(); } catch {}
-          setNightlyPk(null);
-        }} />
+        <WalletButton
+          publicKey={publicKey}
+          nightlyReady={nightlyReady}
+          onConnect={handleConnect}
+          onDisconnect={handleDisconnect}
+        />
       </header>
 
       <section className="flex-1 flex flex-col items-center justify-start gap-6 px-4 py-8 sm:py-12">
@@ -294,7 +328,11 @@ export default function Home() {
         <div className="text-center text-xs text-slate-500 max-w-md">
           {!nightlyReady ? (
             <span className="text-amber-300/80">
-              Install <a className="underline" href="https://nightly.app" target="_blank" rel="noreferrer">Nightly</a> and refresh.
+              Install{' '}
+              <a className="underline" href="https://nightly.app" target="_blank" rel="noreferrer">
+                Nightly
+              </a>{' '}
+              and refresh.
             </span>
           ) : publicKey ? (
             <>
@@ -304,7 +342,8 @@ export default function Home() {
             </>
           ) : (
             <>
-              Nightly detected. <span className="text-amber-300">Click the cookie</span> to connect and start clicking.
+              Nightly detected.{' '}
+              <span className="text-amber-300">Click the cookie</span> to connect and start clicking.
             </>
           )}
         </div>
