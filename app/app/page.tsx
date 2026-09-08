@@ -264,7 +264,7 @@ export default function Home() {
         if (payout <= 0) {
           setToast({ kind: 'ok', msg: `Round complete - ${hits} hits`, sig: signature });
         }
-      }, 2500);
+      }, 4000);
 
       setTimeout(() => setToast(null), 4000);
 
