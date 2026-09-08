@@ -327,7 +327,7 @@ export default function Home() {
     // Delay popup until after reveal animation (8 numbers × 300ms = 2400ms)
     setTimeout(() => {
       setShowResultPopup(true);
-    }, 2500);
+    }, 4000);
 
     setSelectedNumbers([]);
     console.log('Debug play:', result);
