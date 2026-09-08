@@ -376,7 +376,7 @@ export default function Home() {
 
         <div className="w-full flex items-center justify-between">
           <span style={{ fontSize: 10, letterSpacing: '.14em', color: 'var(--text-secondary)' }}>SELECTED <span style={{ color: 'var(--accent-gold)', fontWeight: 700 }}>{selectedNumbers.length}</span> / {MAX_PICKS}</span>
-          <button onClick={() => setSelectedNumbers([])} style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 13, letterSpacing: '.16em', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>CLEAR</button>
+          <button onClick={() => { setSelectedNumbers([]); setLastResult(null); setShowResultPopup(false); }} style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 13, letterSpacing: '.16em', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>CLEAR</button>
         </div>
 
         <div className="w-full">
